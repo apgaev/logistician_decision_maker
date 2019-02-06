@@ -70,9 +70,8 @@ car_type_preparation <- function(input, output, session) {
   return(nocartype)
 }
 
-withcartype_func <- function(input, output, session) {
-  nocartype <- car_type_preparation()
-  withcartype <- filter(nocartype, nas == FALSE)
+withcartype_func <- function(input, output, session, nocartype) {
+  withcartype <- filter(nocartype(), nas == FALSE)
   positions <- c(1,35)
   
   #adds X and car_type to the final table
@@ -82,10 +81,15 @@ withcartype_func <- function(input, output, session) {
   return(withcartype)
 }
 
-nocartype_func <- function(input, output, session) {
-  nocartype <- car_type_preparation()
-  nocartype <- filter(nocartype, nas == TRUE)
+nocartype_func <- function(input, output, session, nocartype) {
+  nocartype <- filter(nocartype(), nas == TRUE)
   nocartype = dplyr::select(nocartype, X)
+  
+  #upload current data
+  daf <- read.csv2("inputclicks.csv", na.strings=c("","NA"))
+  daf$nas <- c(is.na(daf[13]))
+  daf <- filter(daf, nas == FALSE)
+  
   nocartype <- left_join(nocartype, daf)
   positions <- c(1,28)
   nocartype <- dplyr::select(nocartype, positions)
