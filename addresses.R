@@ -28,6 +28,9 @@ nodeparture_original <- function(input, output, session) {
   #in order to works with departure addresses extract it from the dataset
   dfsix = as.matrix(df[2])
   
+  dfsix <- gsub("\\)", "", dfsix)
+  dfsix <- gsub("\\(", "", dfsix)
+  
   #define St.Petersburg addresses
   todelete = grepl("Петербург", dfsix)
   df = data.frame(df, todelete)
@@ -127,7 +130,7 @@ nodeparture_original <- function(input, output, session) {
   df = filter(df, todelete == FALSE)
   df = dplyr::select(df, -todelete)
   dfsix = as.matrix(df[2])
-  
+
   # Create a Progress object
   progress <- shiny::Progress$new()
   # Make sure it closes when we exit this reactive, even if there's an error
@@ -272,9 +275,12 @@ nodeparture_success <- function(input, output, session, nodeparture_one) {
   positions <- c(2)
   
   nodeparture <- rbind(nodeparture, nodestination)
-  
+
   to_maps <- dplyr::select(nodeparture, positions)
   to_maps <- data.frame(to_maps[!duplicated(to_maps), ])
+  
+  to_maps$to_maps..duplicated.to_maps.... <- gsub("\\)", "", to_maps$to_maps..duplicated.to_maps....)
+  to_maps$to_maps..duplicated.to_maps.... <- gsub("\\(", "", to_maps$to_maps..duplicated.to_maps....)
   
   # Create a Progress object
   progress <- shiny::Progress$new()
@@ -294,7 +300,6 @@ nodeparture_success <- function(input, output, session, nodeparture_one) {
     progress$inc(1/nrow(unparsable), detail = percent(i/nrow(unparsable)))
     
     todelete = grepl(unparsable[i, 1], to_maps_v)
-    
     to_maps_v = data.frame(to_maps_v, todelete)
     to_maps_v = filter(to_maps_v, todelete == FALSE)
     
@@ -310,7 +315,7 @@ nodeparture_success <- function(input, output, session, nodeparture_one) {
   
   #create file with unrecognized addresses that would go to the parser
   write.csv(to_maps, file = "to_maps.csv")
-  print(to_maps)
+  
   # Create a Progress object
   progress <- shiny::Progress$new()
   # Make sure it closes when we exit this reactive, even if there's an error
@@ -411,7 +416,7 @@ nodeparture_success <- function(input, output, session, nodeparture_one) {
     moscowstreets <- rbind(moscowstreets, new_stp)
     write.csv2(moscowstreets, file = "moscowstreets.csv")
     
-    regions <- read.csv2("~/Downloads/regions.csv")
+    regions <- read.csv2("regions.csv")
     
     #delete last 2 letters in region names
     jnastr240$region <- substr(jnastr240$region,1,nchar(jnastr240$region)-2)
@@ -443,7 +448,7 @@ nodeparture_success <- function(input, output, session, nodeparture_one) {
       
       #add parsed region to the complete region dataframe
       jnastr240$region <- defined_regions$region
-      
+    
     }
     
     unrecognized_addresses <- select(unparsable_add, X, city)
@@ -497,10 +502,12 @@ withdeparture <- function(input, output, session, nodeparture_second, withdepart
 
 departure <- function(input, output, session, withdeparture_and_destination) {  
   departure_to_join <- filter(withdeparture_and_destination(), X >= 1)
+  write.csv2(departure_to_join, "departure_final.csv")
   return(departure_to_join)
 }
 
 destination <- function(input, output, session, withdeparture_and_destination) {  
   destination_to_join <- filter(withdeparture_and_destination(), X < 1)
+  write.csv2(destination_to_join, "destination_final.csv")
   return(destination_to_join)
 }
