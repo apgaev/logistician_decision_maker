@@ -765,6 +765,74 @@ function(input, output, session) {
     output$accuracy <- renderText(paste0("Точность:", ((1-mean(abs(rfPredict$rfPredict-test$price)/test$price))*100),"%"))
   })
   
+  observeEvent(input$save_the_model, {
+    
+    #import temporary dataset
+    temporary <- read.csv2("temporary.csv")
+    temporary <- select(temporary, -c(X))
+    #do na.omit
+    temporary <- na.omit(temporary)
+    #perform select according to the checkBoxGroup
+    temporary <- select(temporary, input$checkGroup)
+    
+    if (length(hclusters)>0) {
+      temporary$clusters <- hclusters
+    }
+    
+    shinyalert(
+      title = "Создать модель",
+      text = "Введите название для модели",
+      closeOnEsc = TRUE,
+      closeOnClickOutside = TRUE,
+      html = FALSE,
+      type = "input",
+      inputType = "text",
+      inputValue = "",
+      inputPlaceholder = "",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "OK",
+      confirmButtonCol = "#00FFD9",
+      cancelButtonText = "Cancel",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x != FALSE) {
+        
+        models <- read.csv2("models.csv")
+        models <- select(models, -c(X))
+        
+        #load input name
+        rfModel <-randomForest(price ~ ., data=temporary)
+        user_model_name <- input$shinyalert
+        server_model_name <- paste0(tail((as.numeric(gsub('\\D+','', models$server_model_name))), n=1)+1, ".Rdata")
+        
+        if (length(hclusters)>0) {
+          temporary <- select(temporary, -c(price))
+          rfModel_cluster <-randomForest(clusters ~ ., data=temporary)
+          cluster_model_name <- paste0("cluster", tail((as.numeric(gsub('\\D+','', na.omit(models$cluster_model_name)))), n=1)+1, ".Rdata")
+          save(rfModel_cluster, file = cluster_model_name)
+        } else {
+          server_model_name <- NA
+        }
+        
+        addition <- data.frame(user_model_name, server_model_name, cluster_model_name)
+        models <- rbind(models, addition)
+        
+        save(rfModel, file = server_model_name)
+        write.csv2(models, "models.csv")
+        updateSelectInput(session, "choose_for_prediction", choices = (models$user_model_name))
+        print("Done")
+      }}
+    )
+  })
+  
+  observeEvent(input$choose_for_prediction, {
+    the_model_to_use <- input$choose_for_prediction
+    the_model_to_use <- data.frame(the_model_to_use)
+    write.csv2(the_model_to_use, "the_model_to_use.csv")
+  })
+  
   df <- eventReactive({input$create_new_rule
     input$add_elements_to_selected_groups
     input$use_profile

@@ -6,6 +6,7 @@ library(shinyalert)
 
 complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
 cargo_profiles <- read.csv2("~/Downloads/groups_profiles.csv")
+models <- read.csv2("models.csv")
 
 dashboardPage(
   dashboardHeader(title = "Модельер"
@@ -224,7 +225,11 @@ dashboardPage(
             ),
             fluidRow(
               column(1),
-              column(10
+              column(5, useShinyalert(),
+                     actionButton("save_the_model", "Сохранить модель")
+                     #select the model to use in prediction
+              ),
+              column(5, selectInput("choose_for_prediction", "Выберите модель для прогнозирования", choices = models$user_model_name)
                      #select the model to use in prediction
               ),
               column(1)
