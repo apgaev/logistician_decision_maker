@@ -36,16 +36,17 @@ def main():
     price = get_all_links(all_html)
     data = []
 
-    reader = csv.reader(open('usd_diesel.csv', 'r', encoding="utf-8", newline =''))
+    reader = csv.reader(open('/Users/antongaev/Downloads/usd_diesel.csv', 'r', encoding="utf-8", newline =''))
     #convert reader into json
     for row in reader:
             datasuka = {"calendar": row[1], "diesel_price": row[2], "dollar": row[3]}
             data.append(datasuka)
     this_day = datetime.date.today() 
-    
-    last_date = datetime.datetime.strptime(data[1].get("calendar"), "%Y-%M-%d").date()
+    data.pop(0)
+
+    last_date = datetime.datetime.strptime(data[0].get("calendar"), "%Y-%m-%d").date()
     ur = "http://www.cbr.ru/currency_base/daily/?date_req="    
-    
+
     while last_date != this_day:
         url = ur + str(last_date)
         all_html = get_html(url)
@@ -56,7 +57,7 @@ def main():
         sleep(1)
         
     #finally json saver should be added
-    with open('usd_dollar.json', 'w') as fp:
+    with open('/Users/antongaev/Downloads/usd_dollar.json', 'w') as fp:
             json.dump(data, fp)
 
 if __name__ == '__main__':

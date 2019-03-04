@@ -27,7 +27,7 @@ longitudeY = []
 #create list for jsons
 data = []
 
-reader = csv.reader(open('distance_search.csv', 'r', encoding="utf-8", newline =''))
+reader = csv.reader(open('/Users/antongaev/Downloads/distance_search.csv', 'r', encoding="utf-8", newline =''))
 #convert reader into json
 for row in reader:
             h, k, v, a, b, c, e = row
@@ -59,5 +59,5 @@ for i in range(1,len(route)):
         data.append(datasuka)
 
 #finally json saver should be added
-with open('parsed_distances.json', 'w') as fp:
+with open('/Users/antongaev/Downloads/parsed_distances.json', 'w') as fp:
             json.dump(data, fp)

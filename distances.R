@@ -1,5 +1,5 @@
 distances <- function(input, output, session, destination_final, departure_final) {
-  distances <- read.csv2("distances.csv")
+  distances <- read.csv2("~/Downloads/distances.csv")
   distances <- select(distances, distance, route)
   
   departure <- departure_final()
@@ -24,7 +24,7 @@ distances <- function(input, output, session, destination_final, departure_final
   distance_search <- select(distance_search, -c(nas))
   distance_search_na <- select(distance_search_na, X, route, latitude.x, longitude.x, latitude.y, longitude.y)
   distance_search_na <- data.frame(distance_search_na[!duplicated(distance_search_na$route), ])
-  write.csv(distance_search_na, "distance_search.csv")
+  write.csv(distance_search_na, "~/Downloads/distance_search.csv")
   
   # Create a Progress object
   progress <- shiny::Progress$new()
@@ -35,10 +35,10 @@ distances <- function(input, output, session, destination_final, departure_final
   progress$set(message = "Парсинг неопределенных значений", value = 0)
   
   #deploy the parser
-  py_run_file("distances.py")
+  py_run_file("~/Downloads/distances.py")
   
   #unpack the parsed json
-  jnastr240 = readLines("parsed_distances.json") %>% 
+  jnastr240 = readLines("~/Downloads/parsed_distances.json") %>% 
     str_c(collapse = ",") %>%  
     (function(str) str_c("[", str, "]")) %>% 
     fromJSON(simplifyDataFrame = T)
@@ -51,7 +51,7 @@ distances <- function(input, output, session, destination_final, departure_final
     distance_search <- rbind(distance_search, distance_search_na)
     distance_search_na <- select(distance_search_na, distance, route)
     distances <- rbind(distances, distance_search_na)
-    write.csv2(distances, "distances.csv")
+    write.csv2(distances, "~/Downloads/distances.csv")
   }
   distance_search <- select(distance_search, -c(route))
   return(distance_search)

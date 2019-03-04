@@ -1,0 +1,8 @@
+;user_model_name;server_model_name;cluster_model_name;columns_table;cargo_types_ds;original_dt
+1;if na delete it;3.Rdata;cluster1.Rdata;columns_table_0.csv;cargo_types1.csv;7.csv
+2;i guess it is ready;4.Rdata;cluster2.Rdata;columns_table_1.csv;cargo_types2.csv;7.csv
+3;now with cargo_types;5.Rdata;cluster3.Rdata;columns_table_2.csv;cargo_types2.csv;7.csv
+4;almost_comlete_test;6.Rdata;cluster4.Rdata;columns_table_3.csv;cargo_types.csv;7.csv
+5;without a lot;7.Rdata;cluster5.Rdata;columns_table_4.csv;cargo_types.csv;7.csv
+6;check absence of doubles;8.Rdata;cluster6.Rdata;columns_table_5.csv;cargo_types.csv;7.csv
+7;where is vostok_na;9.Rdata;cluster7.Rdata;columns_table_6.csv;cargo_types.csv;7.csv

@@ -4,11 +4,12 @@ library(shinydashboard)
 library(shinyalert)
 library(shinyjs)
 library(reticulate)
-#use_python("/Users/antongaev/anaconda/bin/python", required = T)
+use_python("/Users/antongaev/anaconda/bin/python", required = T)
 library(DT)
 library(tidyr)
 library(stringr)
 library(jsonlite)
+library(scales)
 
 #allow >5mb files for uploading
 options(shiny.maxRequestSize=30*1024^2) 
@@ -76,7 +77,7 @@ ui <- dashboardPage(
                     fluidRow(
                         column(4,
                                div(class="hidden",
-                                   regions <- read.csv2("regions.csv"),
+                                   regions <- read.csv2("~/Downloads/regions.csv"),
                                    regions <- select(regions, region)
                                ),
                                actionButton(inputId = "addresses_starter", label = "Начать обработку адресов", 
@@ -291,7 +292,7 @@ server <- function(input, output, session) {
       
       citiestest <- read.csv2("citiesnew.csv")
       citiestest <- dplyr::select(citiestest, region, city, street, latitude, longitude)
-      regions <- read.csv2("regions.csv")
+      regions <- read.csv2("~/Downloads/regions.csv")
       regions_plus <- regions
       regions <- select(regions, region)
       regions_plus$X <- grepl(input$regions, regions_plus$region)
@@ -300,7 +301,7 @@ server <- function(input, output, session) {
         region <- input$regions
         addition <- data.frame(region)
         regions <- rbind(regions, addition)
-        write.csv2(regions, "regions.csv")
+        write.csv2(regions, "~/Downloads/regions.csv")
       }
       region <- input$regions
       city <- input$newcity
@@ -911,19 +912,19 @@ server <- function(input, output, session) {
           on.exit(progress$close())
           
           #delete strings that cannot be defined through Yandex parser
-          progress$set(message = "Получение исторического курса доллара и цены на топливо", value = 0)
+          progress$set(message = "Загрузка исторического курса доллара и цены на топливо", value = 0)
           
           #deploy the parser
-          py_run_file("usd_diesel.py")
-          jnastr240 = readLines("usd_dollar.json") %>% 
+          py_run_file("~/Downloads/usd_diesel.py")
+          jnastr240 = readLines("~/Downloads/usd_dollar.json") %>% 
             str_c(collapse = ",") %>%  
             (function(str) str_c("[", str, "]")) %>% 
             fromJSON(simplifyDataFrame = T)
           jnastr240<-jnastr240[[1]]
-          write.csv(jnastr240, "usd_diesel.csv")
+          write.csv(jnastr240, "~/Downloads/usd_diesel.csv")
           jnastr240$calendar <- as.Date(jnastr240$calendar)
           final_table <- left_join(final_table, jnastr240, by = "calendar")
-
+          
           #add cargo_type
           cargo_profiles <- read.csv2("cargo_profiles.csv")
           cargo_profiles <- filter(cargo_profiles, user_cargo_profile_name == input$select_cargo_type_profile)
@@ -973,7 +974,7 @@ server <- function(input, output, session) {
           positions <- c(1)
           withfilters <- dplyr::select(daf, positions)
           withfilters$X <- as.character(withfilters$X)
-          departure_final <- select(departure_final, -c(nas, todelete, addresses))
+          departure_final <- select(departure_final, -c(nas, todelete, addresses, street))
           #id, car_type, duration, two_loadings, weight
           final_table <- inner_join(final_table, withfilters)
           departure_final$X <- as.character(departure_final$X)
@@ -982,7 +983,7 @@ server <- function(input, output, session) {
           final_table <- inner_join(final_table, departure_final)
           destination_final$X <- destination_final$X/0.000001
           destination_final$X <- as.character(destination_final$X)
-          destination_final <- select(destination_final, -c(nas, todelete, addresses))
+          destination_final <- select(destination_final, -c(nas, todelete, addresses, street))
           #id, car_type, duration, two_loadings, weight, region, city, latidude, longitude, region.y, city.y, 
           #latidude.y, longitude.y
           final_table <- inner_join(final_table, destination_final, by = "X")
@@ -993,16 +994,57 @@ server <- function(input, output, session) {
           #id, car_type, duration, two_loadings, weight, region, city, latidude, longitude, region.y, city.y, 
           #latidude.y, longitude.y, distances
           final_table <- inner_join(final_table, distances)
+
+          final_table <- separate(final_table, latitude.x, into = c("lat_from", "titude"), sep = "\\.", remove = TRUE)
+          final_table$lat_from <- as.integer(final_table$lat_from)
+          final_table$titude <- substr(final_table$titude, 1, 2)
+          final_table$titude <- as.integer(final_table$titude)
+          final_table$titude <- final_table$titude*0.01
+          final_table$lat_from <- final_table$lat_from+final_table$titude
+          final_table <- select(final_table, -c(titude))
+
+          final_table <- separate(final_table, latitude.y, into = c("lat_to", "titude"), sep = "\\.", remove = TRUE)
+          final_table$lat_to <- as.integer(final_table$lat_to)
+          final_table$titude <- substr(final_table$titude, 1, 2)
+          final_table$titude <- as.integer(final_table$titude)
+          final_table$titude <- final_table$titude*0.01
+          final_table$lat_to <- final_table$lat_to+final_table$titude
+          final_table <- select(final_table, -c(titude))
+
+          final_table <- separate(final_table, longitude.x, into = c("long_from", "titude"), sep = "\\.", remove = TRUE)
+          final_table$long_from <- as.integer(final_table$long_from)
+          final_table$titude <- substr(final_table$titude, 1, 2)
+          final_table$titude <- as.integer(final_table$titude)
+          final_table$titude <- final_table$titude*0.01
+          final_table$long_from <- final_table$long_from+final_table$titude
+          final_table <- select(final_table, -c(titude))
+
+          final_table <- separate(final_table, longitude.y, into = c("long_to", "titude"), sep = "\\.", remove = TRUE)
+          final_table$long_to <- as.integer(final_table$long_to)
+          final_table$titude <- substr(final_table$titude, 1, 2)
+          final_table$titude <- as.integer(final_table$titude)
+          final_table$titude <- final_table$titude*0.01
+          final_table$long_to <- final_table$long_to+final_table$titude
+          final_table <- select(final_table, -c(titude, city.x, city.y, X))
+          
+          final_table$calendar <- as.double(final_table$calendar)
+          final_table$diesel_price <- as.double(final_table$diesel_price)
+          final_table$dollar <- as.double(final_table$dollar)
           
           output$thedataframe <- DT::renderDataTable(final_table)
           
           #total function
           observeEvent(input$save_dt, {complete_dts <- read.csv2("complete_dts.csv")
-            complete_dts <- dplyr::select(complete_dts, user_name, system_name)
+            complete_dts <- dplyr::select(complete_dts, user_name, system_name, cargo_types_ds)
             user_name <- input$dt_name
             system_name <- paste0(as.numeric(tail(complete_dts$system_name, n=1))+1, ".csv")
+            
+            cargo_profiles <- read.csv2("cargo_profiles.csv")
+            cargo_profiles <- filter(cargo_profiles, user_cargo_profile_name == input$select_cargo_type_profile)
+            
+            cargo_types_ds <- paste0(cargo_profiles$system_cargo_profile_name, ".csv")
             write.csv2(final_table, file = system_name)
-            addition <- data.frame(user_name, system_name)
+            addition <- data.frame(user_name, system_name, cargo_types_ds)
             complete_dts <- rbind(complete_dts, addition)
             write.csv2(complete_dts, file = "complete_dts.csv")
           })
