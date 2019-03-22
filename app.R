@@ -185,25 +185,96 @@ ui <- dashboardPage(
                         )
                     )
             ),
-            tabItem(tabName = "no_car",
-                    fluidRow(
+            
+            # Fourth tab content
+            tabItem(tabName = "no_car", theme = "sezar.css",
+                    div(class="hidden",
+                        car_profiles <- read.csv2("car_profiles.csv"),
+                        car_types <- read.csv2(paste0(tail(car_profiles$system_car_profile_name, n=1), ".csv")),
+                        car_types <- select(car_types, car_type, original_value),
+                        car_type_table <- data.frame(sort(table(car_types$car_type), decreasing = TRUE))
+                    ),
+                    fluidPage(
+                      fluidRow(
                         column(1),
-                        column(9,
-                               actionButton(inputId = "car_type_starter", label = "Начать обработку типов ТС"),
-                               selectInput("currentcargroups", h4("Добавить значение в существующую группу"), 
-                                           choices = list("тент" = "тент", 
-                                                          "с боковой/верхней погрузкой/разгрузкой" = "бок",
-                                                          "изотерм" = "изотерм", 
-                                                          "реф" = "реф",
-                                                          selected = "тент")
-                               ),
-                               textInput("add_car", "Введите значение из перечисленных ниже необработанных типов ТС"),
-                               actionButton(inputId = "add_car_type", label = "Добавить в базу данных"),
-                               DT::dataTableOutput("nocar")),
-                        column(2)
-                        
+                        column(
+                          5,
+                          selectInput("select_car_type_profile", "Выберите профиль типов груза",
+                                      choices = (car_profiles$user_car_profile_name))
+                        ),
+                        column(
+                          5, br(),
+                          actionButton("save_car_profile", "Создать профиль", icon("plus"), 
+                                       style="color: #fff; background-color: #1EF003; border-color: #2e6da4")
+                        ),
+                        column(1
+                        )
+                      ),
+                      fluidRow(
+                        column(1),
+                        column(
+                          5,
+                          actionButton("show_uncared", "Выбрать профиль", icon("check-circle"), 
+                                       style="color: #fff; background-color: #00FFD9; border-color: #2e6da4")
+                        ),
+                        column(
+                          5,
+                          useShinyalert(),
+                          actionButton("delete_car_profile", "Удалить выбранный профиль", icon("times"), 
+                                       style="color: #fff; background-color: #F20303; border-color: #2e6da4")
+                        ),
+                        column(1
+                        )
+                      ),
+                      #textInput("cargo_profile_name", "Введите название для нового профиля типов груза"),
+                      fluidRow(
+                        column(1),
+                        column(
+                          10, useShinyjs(),
+                          DT::dataTableOutput('car14'),
+                          textOutput('carz14'),
+                          verbatimTextOutput('cary14')
+                        ),
+                        column(1
+                        )
+                      ),
+                      
+                      fluidRow(
+                        column(1),
+                        column(5,
+                               box(width = 12,
+                                   selectInput("select_car_type", "Выберите группу",
+                                               choices = (cargo_type_table[1]))
+                               )
+                        ),
+                        column(5, br(), br(),
+                               actionButton("add_elements_to_cared_groups", "Добавить выделенные элементы в выбранную группу", icon("plus"), 
+                                            style="color: #fff; background-color: #1EF003; border-color: #2e6da4")
+                               
+                        ),
+                        column(1)
+                      ),
+                      fluidRow(
+                        column(3,
+                               actionButton("create_car_group", "Создать новую группу", icon("plus"), 
+                                            style="color: #fff; background-color: #1EF003; border-color: #2e6da4")
+                        ),
+                        column(3,
+                               actionButton("delete_car_group", "Удалить выделенную группу", icon("times"), 
+                                            style="color: #fff; background-color: #F20303; border-color: #2e6da4")
+                        ),
+                        column(3,
+                               actionButton("create_new_car_rule", "Создать новое правило", icon("plus"), 
+                                            style="color: #fff; background-color: #1EF003; border-color: #2e6da4")
+                        ),
+                        column(3,
+                               actionButton("delete_car_rule", "Удалить выделенное правило", icon("times"), 
+                                            style="color: #fff; background-color: #F20303; border-color: #2e6da4")
+                        )
+                      )
                     )
             ),
+
             tabItem(tabName = "agent_filters",
                     fluidRow(
                         actionButton(inputId = "show_all_agents", label = "Показать всех контрагентов"),
@@ -238,14 +309,14 @@ server <- function(input, output, session) {
   makeReactiveBinding("destination_final")
     
   #add car type function
-  observeEvent(input$add_car_type, {car_types <- read.csv2("car_type.csv")
-    car_types <- dplyr::select(car_types, car_type, original_value)
-    car_type <- input$currentcargroups
-    original_value <- input$add_car
-    addition <- data.frame(car_type, original_value)
-    car_types <- rbind(car_types, addition)
-    write.csv2(car_types, file = "car_type.csv")
-  })
+  #observeEvent(input$add_car_type, {car_types <- read.csv2("car_type.csv")
+    #car_types <- dplyr::select(car_types, car_type, original_value)
+    #car_type <- input$currentcargroups
+    #original_value <- input$add_car
+    #addition <- data.frame(car_type, original_value)
+    #car_types <- rbind(car_types, addition)
+    #write.csv2(car_types, file = "car_type.csv")
+  #})
   
   #add unparsed address func
   observeEvent(input$addcity, {
@@ -705,6 +776,326 @@ server <- function(input, output, session) {
   
   
   
+  
+  
+  #car type functions
+  observeEvent(input$select_car_type_profile, {
+    car_profiles <- read.csv2("car_profiles.csv")
+    car_profiles <- filter(car_profiles, user_car_profile_name == input$select_car_type_profile)
+    car_types <- read.csv2(paste0(car_profiles$system_car_profile_name, ".csv"))
+    car_types <- select(car_types, car_type, original_value)
+    car_type_table <- data.frame(sort(table(car_types$car_type), decreasing = TRUE))
+    updateSelectInput(session, "select_car_type", choices = (car_type_table[1]))
+  })
+  
+  observeEvent(input$create_car_group, {
+    
+    shinyalert(
+      title = "Создать новую группу",
+      text = "Введите названия для новой группы",
+      closeOnEsc = TRUE,
+      closeOnClickOutside = TRUE,
+      html = FALSE,
+      type = "input",
+      inputType = "text",
+      inputValue = "",
+      inputPlaceholder = "",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "OK",
+      confirmButtonCol = "#00FFD9",
+      cancelButtonText = "Cancel",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x != FALSE) {#load profiles
+        car_profiles <- read.csv2("car_profiles.csv")
+        car_profiles <- filter(car_profiles, user_car_profile_name == input$select_car_type_profile)
+        car_types <- read.csv2(paste0(car_profiles$system_car_profile_name, ".csv"))
+        car_types <- select(car_types, car_type, original_value)
+        car_type_table <- data.frame(sort(table(car_types$car_type), decreasing = TRUE))
+        Var1 <- input$shinyalert
+        Freq <- 1
+        addition <- data.frame(Var1, Freq)
+        car_type_table <- rbind(car_type_table, addition)
+        updateSelectInput(session, "select_car_type", choices = (car_type_table[1]))
+      }}
+    )
+  })
+  
+  observeEvent(input$delete_car_group, {
+    
+    shinyalert(
+      title = "Вы точно хотите удалить эту группу?",
+      text = "Результат будет необратим",
+      closeOnEsc = FALSE,
+      closeOnClickOutside = FALSE,
+      html = FALSE,
+      type = "error",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "Удалить",
+      confirmButtonCol = "#ED4242",
+      cancelButtonText = "Нет, оставить",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x == TRUE) {#to delete a group i need to upload current profile
+        #delete selected group also means to delete all the elements of this group, that is why confirmation is needed
+        daf <- read.csv2("inputclicks.csv", na.strings=c("","NA"))
+        dfsix = as.matrix(daf[28])
+        original_cargos <- data.frame(dfsix)
+        
+        car_profiles <- read.csv2("car_profiles.csv")
+        car_profiles <- filter(car_profiles, user_car_profile_name == input$select_car_type_profile)
+        car_types <- read.csv2(paste0(car_profiles$system_car_profile_name, ".csv"))
+        car_types <- select(car_types, car_type, original_value, Freq)
+        
+        #check the selected group
+        changed_values <- filter(car_types, car_type == input$select_car_type)
+        car_types <- filter(car_types, car_type != input$select_car_type)
+        
+        
+        for (i in 1:nrow(changed_values)) {
+          original_cargos$nas <- grepl(changed_values$original_value[i], dfsix)
+          original_cargos_filters <- filter(original_cargos, nas == TRUE)
+          if (nrow(original_cargos_filters) > 0) {
+            original_cargos_filters <- data.frame(original_cargos_filters[!duplicated(original_cargos_filters), ])
+            original_cargos_filters$car_type <- "необработанные"
+            original_cargos_filters$original_value = c(as.matrix(original_cargos_filters[1]))
+            original_cargos_filters$Freq <- nrow(original_cargos_filters)
+          }
+        }
+        
+        if (nrow(original_cargos_filters) > 0) {
+          original_cargos_filters <- select(original_cargos_filters, car_type, original_value, Freq)
+          #rbind the original values to the working prototype
+          car_types <- select(car_types, car_type, original_value, Freq)
+          car_types <- rbind(car_types, original_cargos_filters)
+        }
+        #save
+        write.csv2(car_types, file = paste0(car_profiles$system_car_profile_name, ".csv"))
+        #update select input without this group inside confirmation
+        car_type_table <- data.frame(sort(table(car_types$car_type), decreasing = TRUE))
+        car_type_table <- filter(car_type_table, Freq > 0)
+        updateSelectInput(session, "select_car_type", choices = (car_type_table[1]))
+        click("show_uncared")
+      }}
+    )
+  })
+  
+  observeEvent(input$create_new_car_rule, {
+    
+    shinyalert(
+      title = "Введите новое правило",
+      text = "Все наименования грузов, содержащие данный набор символов, попадут в указанную группу",
+      closeOnEsc = TRUE,
+      closeOnClickOutside = TRUE,
+      html = FALSE,
+      type = "input",
+      inputType = "text",
+      inputValue = "",
+      inputPlaceholder = "",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "OK",
+      confirmButtonCol = "#00FFD9",
+      cancelButtonText = "Cancel",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x != FALSE) {#load profiles
+        car_profiles <- read.csv2("car_profiles.csv")
+        car_profiles <- filter(car_profiles, user_car_profile_name == input$select_car_type_profile)
+        car_types <- read.csv2(paste0(car_profiles$system_car_profile_name, ".csv"))
+        car_types <- select(car_types, car_type, original_value, Freq)
+        car_type <- input$select_car_type
+        original_value <- input$shinyalert
+        car_types$id <- grepl(input$shinyalert, car_types$original_value)
+        addition <- filter(car_types, id == TRUE)
+        Freq <- nrow(addition)
+        car_types <- filter(car_types, id == FALSE)
+        car_types$id <- c(1:nrow(car_types))
+        id <- nrow(car_types)+1
+        addition <- data.frame(car_type, original_value, Freq, id)
+        car_types <- rbind(car_types, addition)
+        write.csv2(car_types, file = paste0(car_profiles$system_car_profile_name, ".csv"))
+        click("show_uncared")
+      }}
+    )
+    
+  })
+  
+  observeEvent(input$add_elements_to_cared_groups, {
+    car_profiles <- read.csv2("car_profiles.csv")
+    car_profiles <- filter(car_profiles, user_car_profile_name == input$select_car_type_profile)
+    car_types <- read.csv2(paste0(car_profiles$system_car_profile_name, ".csv"))
+    car_types <- select(car_types, car_type, original_value, Freq)
+    selected_popkas <- isolate(input$car14_rows_selected)
+    car_types$id <- c(1:nrow(car_types))
+    changed_values <- filter(car_types, id == selected_popkas[1])
+    if (length(selected_popkas) > 1){
+      for (i in 2:length(selected_popkas)){
+        changed_values_add <- filter(car_types, id == selected_popkas[i])
+        changed_values <- rbind(changed_values, changed_values_add)
+      }
+    }
+    changed_values$car_type <- input$select_car_type
+    for (i in 1:length(selected_popkas)){
+      car_types <- filter(car_types, id != selected_popkas[i])
+    }
+    #output$y14 <- DT::renderDataTable(cargo_types, filter = 'top')
+    #output$y14 <- renderPrint( popkies )
+    #output$z14 <- renderPrint(popkies[1])
+    #output$z14 = DT::renderDataTable(changed_values, filter = 'top')
+    car_types <- rbind(car_types, changed_values)
+    car_types <- car_types[order(car_types$id), ]
+    write.csv2(car_types, file = paste0(car_profiles$system_car_profile_name, ".csv"))
+  })
+  
+  
+  observeEvent(input$save_car_profile, {
+    
+    shinyalert(
+      title = "Создать профиль",
+      text = "Введите названия для профиля",
+      closeOnEsc = TRUE,
+      closeOnClickOutside = TRUE,
+      html = FALSE,
+      type = "input",
+      inputType = "text",
+      inputValue = "",
+      inputPlaceholder = "",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "OK",
+      confirmButtonCol = "#00FFD9",
+      cancelButtonText = "Cancel",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x != FALSE) {#load profiles
+        #load profiles
+        car_profiles <- read.csv2("car_profiles.csv")
+        car_profiles <- select(car_profiles, user_car_profile_name, system_car_profile_name)
+        
+        #check the last number, then plus one
+        system_car_profile_name <- paste0("car_types", as.numeric(gsub('\\D+','', tail(car_profiles, n=1)$system_car_profile_name))+1)
+        
+        #load input name
+        user_car_profile_name <- input$shinyalert
+        
+        car_type <- c("необработанные", "другое")
+        original_value <- c("Любые значения группы необработанные не будут учитываться в итоговой таблице", "Создавайте новые группы и добавляйте туда значения")
+        Freq <- c(0, 0)
+        car_types <- data.frame(car_type, original_value, Freq)
+        
+        write.csv2(car_types, file = paste0("car_types", as.numeric(gsub('\\D+','', tail(car_profiles, n=1)$system_car_profile_name))+1, ".csv"))
+        
+        
+        #data frame it in profiles
+        addition <- data.frame(user_car_profile_name, system_car_profile_name)
+        car_profiles <- rbind(car_profiles, addition)
+        write.csv2(car_profiles, file = "car_profiles.csv")
+        
+        updateSelectInput(session, "select_car_type_profile", choices = car_profiles$user_car_profile_name)
+      }}
+    )
+    
+  })
+  
+  observeEvent(input$delete_car_profile, {
+    
+    shinyalert(
+      title = "Вы точно хотите удалить этот профиль?",
+      text = "Результат будет необратим",
+      closeOnEsc = FALSE,
+      closeOnClickOutside = FALSE,
+      html = FALSE,
+      type = "error",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "Удалить",
+      confirmButtonCol = "#ED4242",
+      cancelButtonText = "Нет, оставить",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x == TRUE) {#load profiles
+        car_profiles <- read.csv2("car_profiles.csv")
+        car_profiles <- select(car_profiles, user_car_profile_name, system_car_profile_name)
+        #filter the input value
+        car_profiles <- filter(car_profiles, user_car_profile_name != input$select_car_type_profile)
+        #save
+        write.csv2(car_profiles, file = "car_profiles.csv")
+        updateSelectInput(session, "select_car_type_profile", choices = car_profiles$user_car_profile_name)
+      }}
+    )
+  })
+  
+  #decomposite the rule function
+  observeEvent(input$delete_car_rule, {
+    
+    daf <- read.csv2("inputclicks.csv", na.strings=c("","NA"))
+    dfsix = as.matrix(daf[28])
+    original_cargos <- data.frame(dfsix)
+    
+    car_profiles <- read.csv2("car_profiles.csv")
+    car_profiles <- filter(car_profiles, user_car_profile_name == input$select_car_type_profile)
+    car_types <- read.csv2(paste0(car_profiles$system_car_profile_name, ".csv"))
+    car_types <- select(car_types, car_type, original_value, Freq)
+    
+    #recognise selected rule
+    #grepl the rule from the original dataset
+    
+    selected_values <- isolate(input$car14_rows_selected)
+    #popkies <- as.matrix(selected_popkas)
+    car_types$id <- c(1:nrow(car_types))
+    changed_values <- filter(car_types, id == selected_values[1])
+    if (length(selected_values) > 1){
+      for (i in 2:length(selected_values)){
+        changed_values_add <- filter(car_types, id == selected_values[i])
+        changed_values <- rbind(changed_values, changed_values_add)
+      }
+    }
+    
+    #changed_values$cargo_type <- input$select_cargo_type
+    
+    for (i in 1:length(selected_values)){
+      car_types <- filter(car_types, id != selected_values[i])
+    }
+    for (i in 1:nrow(changed_values)) {
+      original_cargos$nas <- grepl(changed_values$original_value[i], dfsix)
+      original_cargos_filters <- filter(original_cargos, nas == TRUE)
+      if (nrow(original_cargos_filters) > 0) {
+        original_cargos_filters <- data.frame(original_cargos_filters[!duplicated(original_cargos_filters), ])
+        original_cargos_filters$car_type <- "необработанные"
+        original_cargos_filters$original_value = c(as.matrix(original_cargos_filters[1]))
+        original_cargos_filters$Freq <- nrow(original_cargos_filters)
+      }
+    }
+    if (nrow(original_cargos_filters) > 0) {
+      original_cargos_filters <- select(original_cargos_filters, car_type, original_value, Freq)
+      #rbind the original values to the working prototype
+      car_types <- select(car_types, car_type, original_value, Freq)
+      car_types <- rbind(car_types, original_cargos_filters)
+    }
+    #save
+    write.csv2(car_types, file = paste0(car_profiles$system_car_profile_name, ".csv"))
+    
+  })
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
     #input initial data
     observeEvent(input$clicks, {df <- read.csv2(input$file1$datapath)
         write.csv2(df, file = "inputclicks.csv")
@@ -795,28 +1186,111 @@ server <- function(input, output, session) {
             original_value <- dplyr::select(original_value, positions)
             original_value <- data.frame(sort(table(original_value), decreasing = TRUE))
             original_value$cargo_type <- "необработанные"
-            #nocargotype <- data.frame(nocargotype[!duplicated(nocargotype), ])
-            #cargo_types <- read.csv2("cargo_types.csv")
-            #cargo_types <- select(cargo_types, cargo_type, original_value)
-            #cargo_type <- "необработанные"
-            #original_value <- c(as.matrix(nocargotype[1]))
-            #addition <- data.frame(cargo_type, original_value)
             cargo_types <- rbind(cargo_types, original_value)
             
             
             
             write.csv2(cargo_types, paste0(cargo_profiles$system_cargo_profile_name, ".csv"))
             cargo_types
-            #cargo_type_table <- data.frame(sort(table(cargo_types$cargo_type), decreasing = TRUE))
           })
         
+        
+        
+        
+        
+        
+        
+        
+        #car_type
+        output$car14 = DT::renderDataTable(vehicle(), filter = 'top')
+        vehicle <- eventReactive({input$create_new_car_rule
+          input$add_elements_to_cared_groups
+          input$delete_car_rule
+          input$show_uncared}, {
+            
+            car_profiles <- read.csv2("car_profiles.csv")
+            car_profiles <- filter(car_profiles, user_car_profile_name == input$select_car_type_profile)
+            car_types <- read.csv2(paste0(car_profiles$system_car_profile_name, ".csv"))
+            car_types <- select(car_types, car_type, original_value, Freq)
+            car_types <- filter(car_types, car_type != "необработанные")
+            
+            dfsix = as.matrix(daf[28])
+            todelete = grepl("Это фиктивная переменная, она не попадет в итоговую выборку", dfsix)
+            df = data.frame(daf, todelete)
+            moscow = filter(df, todelete == TRUE)
+            df = filter(df, todelete == FALSE)
+            df = dplyr::select(df, -todelete)
+            dfsix = as.matrix(df[28])
+            
+            car_type <- "необработанные"
+            todelete = TRUE
+            Freq <- nrow(moscow)
+            car_type <- data.frame(car_type, todelete, Freq)
+            moscow = left_join(moscow, car_type, by = "todelete")
+            adresestojoin = moscow
+            
+            # Create a Progress object
+            progress <- shiny::Progress$new()
+            # Make sure it closes when we exit this reactive, even if there's an error
+            on.exit(progress$close())
+            
+            progress$set(message = "Обработка типов TC", value = 0)
+            
+            for (i in 2:nrow(car_types)) {
+              # Increment the progress bar, and update the detail text.
+              progress$inc(1/nrow(car_types), detail = percent(i/nrow(car_types)))
+              todelete = grepl(car_types[i, 2], dfsix)
+              df = data.frame(df, todelete)
+              moscow = filter(df, todelete == TRUE)
+              df = filter(df, todelete == FALSE)
+              df = dplyr::select(df, -todelete)
+              dfsix = as.matrix(df[28])
+              car_type <- car_types[i, 1]
+              todelete = TRUE
+              car_type <- data.frame(car_type, todelete, Freq)
+              moscow = left_join(moscow, car_type, by = "todelete")
+              adresestojoin = rbind(adresestojoin, moscow)
+            }
+            
+            original_value <- left_join(id, adresestojoin)
+            original_value$nas <- c(is.na(original_value[2]))
+            
+            withcartype <- filter(original_value, nas == FALSE)
+            positions <- c(1,34)
+            withcartype <- dplyr::select(withcartype, positions)
+            original_value <- filter(original_value, nas == TRUE)
+            original_value = dplyr::select(original_value, X)
+            original_value <- left_join(original_value, daf)
+            
+            positions <- c(28)
+            original_value <- dplyr::select(original_value, positions)
+            original_value <- data.frame(sort(table(original_value), decreasing = TRUE))
+            original_value$car_type <- "необработанные"
+            car_types <- rbind(car_types, original_value)
+            
+            
+            
+            write.csv2(car_types, paste0(car_profiles$system_car_profile_name, ".csv"))
+            car_types
+          })
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         #car_type module
-        observeEvent(input$car_type_starter, {
-          nocartype <- callModule(car_type_preparation, "car_type")
-          withcartype <<- callModule(withcartype_func, "car_type", reactive(nocartype))
-          nocartype <- callModule(nocartype_func, "car_type",  reactive(nocartype))
-          output$nocar <- DT::renderDataTable(nocartype, colnames = c('Номер перевозки', 'Необработанный тип ТС'))
-        })
+        #observeEvent(input$car_type_starter, {
+          #nocartype <- callModule(car_type_preparation, "car_type")
+          #withcartype <<- callModule(withcartype_func, "car_type", reactive(nocartype))
+          #nocartype <- callModule(nocartype_func, "car_type",  reactive(nocartype))
+          #output$nocar <- DT::renderDataTable(nocartype, colnames = c('Номер перевозки', 'Необработанный тип ТС'))
+        #})
         
         #addresses module
         observeEvent(input$addresses_starter, {
@@ -887,12 +1361,49 @@ server <- function(input, output, session) {
           id$cargo_price <- as.character(id$cargo_price)
           id$cargo_price <- gsub("[[:space:]]", "", id$cargo_price)
           id$cargo_price <- as.numeric(id$cargo_price)
-          withcartype$X <- as.character(withcartype$X)
+          #withcartype$X <- as.character(withcartype$X)
+          
+          #add car_type
+          car_profiles <- read.csv2("car_profiles.csv")
+          car_profiles <- filter(car_profiles, user_car_profile_name == input$select_car_type_profile)
+          car_types <- read.csv2(paste0(car_profiles$system_car_profile_name, ".csv"))
+          car_types <- select(car_types, car_type, original_value, Freq)
+          car_types <- filter(car_types, car_type != "необработанные")
+          positions <- c(1,28)
+          dfsix <- select(daf, positions)
+          dfsix$todelete = grepl(c(as.matrix(car_types$original_value[1])), c(as.matrix(dfsix[2])))
+          dfsix$car_type <- car_types$car_type[1]
+          moscow = select(dfsix, X, car_type)
+          dfsix <- select(dfsix, -c(todelete, car_type))
+          moscowbasis <- head(moscow, n=0)
+          
+          # Create a Progress object
+          progress <- shiny::Progress$new()
+          # Make sure it closes when we exit this reactive, even if there's an error
+          on.exit(progress$close())
+          
+          progress$set(message = "Подключение модулей", value = 0)
+          for (i in 1:nrow(car_types)) {
+            
+            # Increment the progress bar, and update the detail text.
+            progress$inc(1/nrow(car_types), detail = percent(i/nrow(car_types)))
+            dfsix$todelete = grepl(c(as.matrix(car_types$original_value[i])), c(as.matrix(dfsix[2])))
+            dfsix$car_type <- car_types$car_type[i]
+            moscow = filter(dfsix, todelete == TRUE)
+            moscow <- select(moscow, X, car_type)
+            dfsix = filter(dfsix, todelete == FALSE)
+            dfsix = dplyr::select(dfsix, -c(todelete, car_type))
+            moscowbasis <- rbind(moscowbasis, moscow)
+          }
+          
+          moscowbasis$X <- as.character(moscowbasis$X)
+          id$X <- as.character(id$X)
+          final_table <- inner_join(id, moscowbasis, by = "X")
           
           #id, car_type
-          id$X <- as.character(id$X)
-          final_table <- inner_join(id, withcartype)
+          #final_table <- inner_join(id, withcartype)
           final_table$X <- as.character(final_table$X)
+          
           trip_duration$X <- as.character(trip_duration$X)
           
           #id, car_type, duration
