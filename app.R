@@ -91,9 +91,23 @@ ui <- dashboardPage(
                                textInput("newstreet", "Введите наименование улицы для записи в базе данных"),
                                numericInput("city_latitude", "Введите широту координат населенного пункта", value = 59.57, min = 40, max = 70, step = 0.01),
                                numericInput("city_longitude", "Введите долготу координат населенного пункта", value = 30.19, min = 19, max = 161, step = 0.01),
-                               actionButton(inputId = "addcity", label = "Добавить в базу данных")),
+                               actionButton(inputId = "addcity", label = "Добавить в базу данных"),
+                               actionButton(inputId = "change_address", label = "Изменить адрес в базе данных")),
                         column(8,                      
                                DT::dataTableOutput('nodeparture'))
+                    ),
+                    br(),
+                    fluidRow(
+                      actionButton("show_stp", "Показать адреса в Санкт-Петербурге"),
+                      DT::dataTableOutput('stp_streets')
+                    ),
+                    fluidRow(
+                      actionButton("show_msc", "Показать адреса в Москве"),
+                      DT::dataTableOutput('msc_streets')
+                    ),
+                    fluidRow(
+                      actionButton("show_rf", "Показать адреса в городах"),
+                      DT::dataTableOutput('city_streets')
                     )
             ),
             
@@ -137,7 +151,6 @@ ui <- dashboardPage(
                             column(1
                             )
                         ),
-                        #textInput("cargo_profile_name", "Введите название для нового профиля типов груза"),
                         fluidRow(
                             column(1),
                             column(
@@ -226,7 +239,6 @@ ui <- dashboardPage(
                         column(1
                         )
                       ),
-                      #textInput("cargo_profile_name", "Введите название для нового профиля типов груза"),
                       fluidRow(
                         column(1),
                         column(
@@ -274,7 +286,6 @@ ui <- dashboardPage(
                       )
                     )
             ),
-
             tabItem(tabName = "agent_filters",
                     fluidRow(
                         actionButton(inputId = "show_all_agents", label = "Показать всех контрагентов"),
@@ -308,15 +319,135 @@ server <- function(input, output, session) {
   destination_final <- NULL
   makeReactiveBinding("destination_final")
     
-  #add car type function
-  #observeEvent(input$add_car_type, {car_types <- read.csv2("car_type.csv")
-    #car_types <- dplyr::select(car_types, car_type, original_value)
-    #car_type <- input$currentcargroups
-    #original_value <- input$add_car
-    #addition <- data.frame(car_type, original_value)
-    #car_types <- rbind(car_types, addition)
-    #write.csv2(car_types, file = "car_type.csv")
-  #})
+  #show cities dts
+  observeEvent(input$show_stp, {stpetersburgstreets <- read.csv2("stpetersburgstreets.csv")
+    stpetersburgstreets <- dplyr::select(stpetersburgstreets, -c(X))
+    output$stp_streets <- DT::renderDataTable(stpetersburgstreets)
+  })
+  
+  observeEvent(input$show_msc, {moscowstreets <- read.csv2("moscowstreets.csv")
+    moscowstreets <- dplyr::select(moscowstreets, -c(X))
+    output$msc_streets <- DT::renderDataTable(moscowstreets)
+  })
+  
+  observeEvent(input$show_rf, {citiesnew <- read.csv2("citiesnew.csv")
+    citiesnew <- dplyr::select(citiesnew, -c(X))
+    output$city_streets <- DT::renderDataTable(citiesnew)
+  })
+  
+  observeEvent(input$stp_streets_rows_selected, {
+    selected_filters <- isolate(input$stp_streets_rows_selected)
+    
+    stpetersburgstreets <- read.csv2("stpetersburgstreets.csv")
+    stpetersburgstreets <- filter(stpetersburgstreets, X == selected_filters[1])
+
+    updateSelectizeInput(session, "regions", "Выберите субъект федерации", choices = (regions$region),
+                         options = list(create = TRUE),
+                         selected = "Санкт-Петербург")
+    
+    updateTextInput(session, "newcity", "Введите наименование населенного пункта для записи в базе данных", stpetersburgstreets$city)
+    updateTextInput(session, "newstreet", "Введите наименование улицы для записи в базе данных", stpetersburgstreets$street)
+    
+    updateNumericInput(session, "city_latitude", "Введите широту координат населенного пункта", value = as.double(as.character(stpetersburgstreets$latitude)), min = 40, max = 70, step = 0.01)
+    updateNumericInput(session, "city_longitude", "Введите долготу координат населенного пункта", value = as.double(as.character(stpetersburgstreets$longitude)), min = 19, max = 161, step = 0.01)
+  })
+  
+  observeEvent(input$msc_streets_rows_selected, {
+    selected_filters <- isolate(input$msc_streets_rows_selected)
+    
+    moscowstreets <- read.csv2("moscowstreets.csv")
+    moscowstreets <- filter(moscowstreets, X == selected_filters[1])
+    
+    updateSelectizeInput(session, "regions", "Выберите субъект федерации", choices = (regions$region),
+                         options = list(create = TRUE),
+                         selected = "Москва")
+    
+    updateTextInput(session, "newcity", "Введите наименование населенного пункта для записи в базе данных", moscowstreets$city)
+    updateTextInput(session, "newstreet", "Введите наименование улицы для записи в базе данных", moscowstreets$street)
+    
+    updateNumericInput(session, "city_latitude", "Введите широту координат населенного пункта", value = as.double(as.character(moscowstreets$latitude)), min = 40, max = 70, step = 0.01)
+    updateNumericInput(session, "city_longitude", "Введите долготу координат населенного пункта", value = as.double(as.character(moscowstreets$longitude)), min = 19, max = 161, step = 0.01)
+  })
+  
+  observeEvent(input$city_streets_rows_selected, {
+    selected_filters <- isolate(input$city_streets_rows_selected)
+    
+    citiesnew <- read.csv2("citiesnew.csv")
+    citiesnew <- filter(citiesnew, X == selected_filters[1])
+    
+    updateSelectizeInput(session, "regions", "Выберите субъект федерации", choices = (regions$region),
+                         options = list(create = TRUE),
+                         selected = as.character(citiesnew$region))
+    
+    updateTextInput(session, "newcity", "Введите наименование населенного пункта для записи в базе данных", citiesnew$city)
+    updateTextInput(session, "newstreet", "Введите наименование улицы для записи в базе данных", citiesnew$street)
+    
+    updateNumericInput(session, "city_latitude", "Введите широту координат населенного пункта", value = as.double(as.character(citiesnew$latitude)), min = 40, max = 70, step = 0.01)
+    updateNumericInput(session, "city_longitude", "Введите долготу координат населенного пункта", value = as.double(as.character(citiesnew$longitude)), min = 19, max = 161, step = 0.01)
+  })
+  
+  observeEvent(input$change_address, {
+    if (input$regions == "Санкт-Петербург") {
+      selected_filters <- isolate(input$stp_streets_rows_selected)
+      stpetersburgstreets <- read.csv2("stpetersburgstreets.csv")
+      stpetersburgstreets <- filter(stpetersburgstreets, X != selected_filters[1])
+      stpetersburgstreets <- dplyr::select(stpetersburgstreets, region, city, street, latitude, longitude)
+      
+      region <- "Санкт-Петербург"
+      city <- "Санкт-Петербург"
+      street <- input$newstreet
+      latitude <- as.character(input$city_latitude)
+      longitude <- as.character(input$city_longitude)
+      addition <- data.frame(region, city, street, latitude, longitude)
+      stpetersburgstreets <- rbind(stpetersburgstreets, addition)
+      write.csv2(stpetersburgstreets, file = "stpetersburgstreets.csv")
+      output$stp_streets <- DT::renderDataTable(stpetersburgstreets)
+      
+    } else if (input$regions == "Москва") {
+      selected_filters <- isolate(input$msc_streets_rows_selected)
+      moscowstreets <- read.csv2("moscowstreets.csv")
+      moscowstreets <- filter(moscowstreets, X != selected_filters[1])
+      moscowstreets <- dplyr::select(moscowstreets, region, city, street, latitude, longitude)
+      
+      region <- "Москва"
+      city <- "Москва"
+      street <- input$newstreet
+      latitude <- as.character(input$city_latitude)
+      longitude <- as.character(input$city_longitude)
+      addition <- data.frame(region, city, street, latitude, longitude)
+      moscowstreets <- rbind(moscowstreets, addition)
+      write.csv2(moscowstreets, file = "moscowstreets.csv")
+      output$msc_streets <- DT::renderDataTable(moscowstreets)
+      
+    } else {
+      selected_filters <- isolate(input$city_streets_rows_selected)
+      citiestest <- read.csv2("citiesnew.csv")
+      citiestest <- filter(citiestest, X != selected_filters[1])
+      citiestest <- dplyr::select(citiestest, region, city, street, latitude, longitude)
+      
+      regions <- read.csv2("~/Downloads/regions.csv")
+      regions_plus <- regions
+      regions <- select(regions, region)
+      regions_plus$X <- grepl(input$regions, regions_plus$region)
+      regions_plus <- filter(regions_plus, X == TRUE)
+      if (nrow(regions_plus) == 0) {
+        region <- input$regions
+        addition <- data.frame(region)
+        regions <- rbind(regions, addition)
+        write.csv2(regions, "~/Downloads/regions.csv")
+      }
+      region <- input$regions
+      city <- input$newcity
+      street <- input$newstreet
+      latitude <- as.character(input$city_latitude)
+      longitude <- as.character(input$city_longitude)
+      addition <- data.frame(region, city, street, latitude, longitude)
+      citiestest <- rbind(citiestest, addition)
+      write.csv2(citiestest, file = "citiesnew.csv")
+      output$city_streets <- DT::renderDataTable(citiestest)
+      
+    }
+  })
   
   #add unparsed address func
   observeEvent(input$addcity, {
@@ -861,7 +992,7 @@ server <- function(input, output, session) {
           original_cargos_filters <- filter(original_cargos, nas == TRUE)
           if (nrow(original_cargos_filters) > 0) {
             original_cargos_filters <- data.frame(original_cargos_filters[!duplicated(original_cargos_filters), ])
-            original_cargos_filters$car_type <- "необработанные"
+            original_cargos_filters$cargo_type <- "необработанные"
             original_cargos_filters$original_value = c(as.matrix(original_cargos_filters[1]))
             original_cargos_filters$Freq <- nrow(original_cargos_filters)
           }
@@ -878,7 +1009,7 @@ server <- function(input, output, session) {
         #update select input without this group inside confirmation
         car_type_table <- data.frame(sort(table(car_types$car_type), decreasing = TRUE))
         car_type_table <- filter(car_type_table, Freq > 0)
-        updateSelectInput(session, "select_car_type", choices = (car_type_table[1]))
+        updateSelectInput(session, "select_cargo_type", choices = (car_type_table[1]))
         click("show_uncared")
       }}
     )
