@@ -212,7 +212,7 @@ ui <- dashboardPage(
                         column(1),
                         column(
                           5,
-                          selectInput("select_car_type_profile", "Выберите профиль типов груза",
+                          selectInput("select_car_type_profile", "Выберите профиль типов ТС",
                                       choices = (car_profiles$user_car_profile_name))
                         ),
                         column(
@@ -1672,21 +1672,28 @@ server <- function(input, output, session) {
           final_table$calendar <- as.double(final_table$calendar)
           final_table$diesel_price <- as.double(final_table$diesel_price)
           final_table$dollar <- as.double(final_table$dollar)
-          
-          output$thedataframe <- DT::renderDataTable(final_table)
+          final_table$price_in_dollar <- final_table$price/final_table$dollar
+          output$thedataframe <- DT::renderDataTable(final_table, options = list(
+            scrollX = TRUE
+          ))
           
           #total function
           observeEvent(input$save_dt, {complete_dts <- read.csv2("complete_dts.csv")
-            complete_dts <- dplyr::select(complete_dts, user_name, system_name, cargo_types_ds)
+            complete_dts <- dplyr::select(complete_dts, user_name, system_name, cargo_types_ds, car_types_ds)
             user_name <- input$dt_name
-            system_name <- paste0(as.numeric(tail(complete_dts$system_name, n=1))+1, ".csv")
+            system_name <- paste0(as.numeric(gsub('\\D+','', tail(complete_dts$system_name, n=1)))+1, ".csv")
             
             cargo_profiles <- read.csv2("cargo_profiles.csv")
             cargo_profiles <- filter(cargo_profiles, user_cargo_profile_name == input$select_cargo_type_profile)
             
+            car_profiles <- read.csv2("car_profiles.csv")
+            car_profiles <- filter(car_profiles, user_car_profile_name == input$select_car_type_profile)
+            
             cargo_types_ds <- paste0(cargo_profiles$system_cargo_profile_name, ".csv")
+            car_types_ds <- paste0(car_profiles$system_car_profile_name, ".csv")
+            
             write.csv2(final_table, file = system_name)
-            addition <- data.frame(user_name, system_name, cargo_types_ds)
+            addition <- data.frame(user_name, system_name, cargo_types_ds, car_types_ds)
             complete_dts <- rbind(complete_dts, addition)
             write.csv2(complete_dts, file = "complete_dts.csv")
           })
