@@ -146,6 +146,10 @@ function(input, output, session) {
     output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
       scrollX = TRUE
     ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   
@@ -185,28 +189,21 @@ function(input, output, session) {
     
     columns_table <- read.csv2("columns_table.csv")
     columns_table <- select(columns_table, -c(X))
-    #print("filter start")
     columns_table <- filter(columns_table, column_name != input$plus_name)
-    #print("filter end")
     column_name <- input$plus_name
     profile_module_used <- "minus_module.R"
-    #print(column_name)
-    #print(profile_module_used)
-    #print(parent_column_names)
     addition <- data.frame(column_name, profile_module_used, parent_column_names)
-    #print(addition)
-    #print(columns_table)
     columns_table <- rbind(columns_table, addition)
-    #print(columns_table)
     write.csv2(columns_table, "columns_table.csv")
-    #print(columns_table)
     #these positions have to equal the positions selected, that is why dt has to be the same
     selected_dt <- select(selected_dt, -c(price, price_in_dollar))
-    #print(head(selected_dt))
     output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
       scrollX = TRUE
     ))
-    #print("done")
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$multiplymultiply, {
@@ -258,6 +255,10 @@ function(input, output, session) {
     output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
       scrollX = TRUE
     ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$dividedivide, {
@@ -309,6 +310,10 @@ function(input, output, session) {
     output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
       scrollX = TRUE
     ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$loglog, {
@@ -360,6 +365,10 @@ function(input, output, session) {
     output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
       scrollX = TRUE
     ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$expexp, {
@@ -411,6 +420,10 @@ function(input, output, session) {
     output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
       scrollX = TRUE
     ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$create_new_group, {
