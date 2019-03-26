@@ -6,7 +6,7 @@ library(shinyalert)
 
 complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
 cargo_profiles <- read.csv2("~/Downloads/groups_profiles.csv")
-models <- read.csv2("models.csv")
+models <- read.csv2("~/Downloads/models.csv")
 
 dashboardPage(
   dashboardHeader(title = "Модельер"
@@ -219,8 +219,11 @@ dashboardPage(
             ),
             fluidRow(
               column(1),
-              column(10, verbatimTextOutput("accuracy")
-              ),
+              #column(3, verbatimTextOutput("accuracy")
+              #),
+              #column(3, verbatimTextOutput("dollar_accuracy")
+              #),
+              column(10, tableOutput('ruble_dollar')),
               column(1)
             ),
             fluidRow(
