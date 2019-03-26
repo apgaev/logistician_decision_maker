@@ -15,6 +15,37 @@ function(input, output, session) {
   output$upper_border = DT::renderDataTable(up_border(), filter = 'top', colnames = c('Значение', 'Меньше чем'))
   output$factor_filter = DT::renderDataTable(fac_filter(), filter = 'top', colnames = c('Значение', 'Не равно'))
   
+  #delete irrelevant datasets
+  observeEvent(input$delete_dts, {
+    
+    shinyalert(
+      title = "Вы точно хотите удалить эту таблицу?",
+      text = "Результат будет необратим",
+      closeOnEsc = FALSE,
+      closeOnClickOutside = FALSE,
+      html = FALSE,
+      type = "error",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "Удалить",
+      confirmButtonCol = "#ED4242",
+      cancelButtonText = "Нет, оставить",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x == TRUE) {#load dts
+        complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
+        complete_dts <- select(complete_dts, -c(X))
+        complete_dts_filter <- filter(complete_dts, user_name != input$initial_select)
+        
+        #update selector
+        updateSelectInput(session, "initial_select", choices = complete_dts_filter$user_name)
+        
+        write.csv2(complete_dts_filter, "~/Downloads/complete_dts.csv")
+      }}
+    )
+  })
+  
   observeEvent(input$initial_select, {complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
     complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
     selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
@@ -884,6 +915,7 @@ function(input, output, session) {
   
   low_border <- eventReactive({
     input$apply_numeric_filter
+    input$delete_filters
     input$select_column_filter
     }, {
     lower_border <- read.csv2("~/Downloads/cargo_type_module/lower_border.csv")
@@ -893,6 +925,7 @@ function(input, output, session) {
   
   up_border <- eventReactive({
     input$apply_numeric_filter
+    input$delete_filters
     input$select_column_filter
   }, {
     upper_border <- read.csv2("~/Downloads/cargo_type_module/upper_border.csv")
@@ -902,6 +935,7 @@ function(input, output, session) {
   
   fac_filter <- eventReactive({
     input$apply_factor_filter
+    input$delete_filters
     input$select_column_filter
   }, {
     factor_filter <- read.csv2("~/Downloads/cargo_type_module/factor_filter.csv")
@@ -984,6 +1018,58 @@ function(input, output, session) {
     
     #write temporary file with all prices
     write.csv2(temporary, temporary_name)
+  })
+  
+  observeEvent(input$delete_filters, {
+    low_border_col_sel <- isolate(input$lower_border_rows_selected)
+    up_border_col_sel <- isolate(input$upper_border_rows_selected)
+    fac_filter_col_sel <- isolate(input$factor_filter_rows_selected)
+    
+    #upload filter dataset
+    if (length(low_border_col_sel) > 0){
+      lower_border <- read.csv2("lower_border.csv")
+      lower_border <- select(lower_border, -c(X))
+      lower_border$id <- c(1:nrow(lower_border))
+      changed_values <- filter(lower_border, id != low_border_col_sel[1])
+      
+      if (length(low_border_col_sel) > 1){
+        for (i in 2:length(low_border_col_sel)){
+          changed_values <- filter(changed_values, id != low_border_col_sel[i])
+        }
+      }
+      changed_values <- select(changed_values, -c(id))
+      write.csv2(changed_values, "lower_border.csv")
+    }
+    
+    if (length(up_border_col_sel) > 0){
+      upper_border <- read.csv2("upper_border.csv")
+      upper_border <- select(upper_border, -c(X))
+      upper_border$id <- c(1:nrow(upper_border))
+      changed_values <- filter(upper_border, id != up_border_col_sel[1])
+      
+      if (length(up_border_col_sel) > 1){
+        for (i in 2:length(up_border_col_sel)){
+          changed_values <- filter(changed_values, id != up_border_col_sel[i])
+        }
+      }
+      changed_values <- select(changed_values, -c(id))
+      write.csv2(changed_values, "upper_border.csv")
+    }
+    
+    if (length(fac_filter_col_sel) > 0){
+      factor_filter <- read.csv2("factor_filter.csv")
+      factor_filter <- select(factor_filter, -c(X))
+      factor_filter$id <- c(1:nrow(factor_filter))
+      changed_values <- filter(factor_filter, id != fac_filter_col_sel[1])
+      
+      if (length(fac_filter_col_sel) > 1){
+        for (i in 2:length(fac_filter_col_sel)){
+          changed_values <- filter(changed_values, id != fac_filter_col_sel[i])
+        }
+      }
+      changed_values <- select(changed_values, -c(id))
+      write.csv2(changed_values, "factor_filter.csv")
+    }
   })
   
   observeEvent(input$unsupervised, {
@@ -1186,6 +1272,37 @@ function(input, output, session) {
     the_model_to_use <- input$choose_for_prediction
     the_model_to_use <- data.frame(the_model_to_use)
     write.csv2(the_model_to_use, "the_model_to_use.csv")
+  })
+  
+  observeEvent(input$delete_model, {
+    
+    shinyalert(
+      title = "Вы точно хотите удалить эту модель?",
+      text = "Результат будет необратим",
+      closeOnEsc = FALSE,
+      closeOnClickOutside = FALSE,
+      html = FALSE,
+      type = "error",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "Удалить",
+      confirmButtonCol = "#ED4242",
+      cancelButtonText = "Нет, оставить",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x == TRUE) {
+        
+        models <- read.csv2("~/Downloads/models.csv")
+        models <- select(models, -c(X))
+        
+        models <- filter(models, user_model_name != input$choose_for_prediction)
+        
+        updateSelectInput(session, "choose_for_prediction", choices = (models$user_model_name))
+        
+        write.csv2(models, "~/Downloads/models.csv")
+      }}
+    )
   })
   
   df <- eventReactive({input$create_new_rule
