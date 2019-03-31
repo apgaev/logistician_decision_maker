@@ -2,7 +2,6 @@ library(shiny)
 library(dplyr)
 library(shinydashboard)
 library(shinyalert)
-#library(caret)
 library(randomForest)
 
 function(input, output, session) {
@@ -10,39 +9,99 @@ function(input, output, session) {
   hclusters <- NULL
   makeReactiveBinding("hclusters")
   
+  #initiate dts rendered by fuctions
   output$x14 = DT::renderDataTable(df(), filter = 'top')
+  output$lower_border = DT::renderDataTable(low_border(), filter = 'top', colnames = c('Значение', 'Больше чем'))
+  output$upper_border = DT::renderDataTable(up_border(), filter = 'top', colnames = c('Значение', 'Меньше чем'))
+  output$factor_filter = DT::renderDataTable(fac_filter(), filter = 'top', colnames = c('Значение', 'Не равно'))
   
-  output$lower_border = DT::renderDataTable(low_border(), filter = 'top')
-  output$upper_border = DT::renderDataTable(up_border(), filter = 'top')
-  output$factor_filter = DT::renderDataTable(fac_filter(), filter = 'top')
+  #delete irrelevant datasets
+  observeEvent(input$delete_dts, {
+    
+    shinyalert(
+      title = "Вы точно хотите удалить эту таблицу?",
+      text = "Результат будет необратим",
+      closeOnEsc = FALSE,
+      closeOnClickOutside = FALSE,
+      html = FALSE,
+      type = "error",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "Удалить",
+      confirmButtonCol = "#ED4242",
+      cancelButtonText = "Нет, оставить",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x == TRUE) {#load dts
+        complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
+        complete_dts <- select(complete_dts, -c(X))
+        complete_dts_filter <- filter(complete_dts, user_name != input$initial_select)
+        
+        #update selector
+        updateSelectInput(session, "initial_select", choices = complete_dts_filter$user_name)
+        
+        write.csv2(complete_dts_filter, "~/Downloads/complete_dts.csv")
+      }}
+    )
+  })
   
   observeEvent(input$initial_select, {complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
     complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
     selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
+    #print(selected_path)
     selected_dt <- read.csv2(selected_path)
     selected_dt <- select(selected_dt, -c(X))
-    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'))
-    updateSelectInput(session, "select_column", choices = colnames(selected_dt))
+    
+    models <- read.csv2("~/Downloads/models.csv")
+    temporary_name <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+    
+    #write temporary file with all prices
+    write.csv2(selected_dt, temporary_name)
+    
+    #update selectors without prices not to allow user create other columns based on it
     updateSelectInput(session, "select_column_filter", choices = colnames(selected_dt))
+    
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(price, price_in_dollar, distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
     updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
                              selected = colnames(selected_dt), inline = TRUE)
-    write.csv2(selected_dt, "~/Downloads/cargo_type_module/temporary.csv")
+    
+    complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
+    complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
+    selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
+    #print(selected_path)
+    selected_dt <- read.csv2(selected_path)
+    selected_dt <- select(selected_dt, -c(X))
+    
+    #show dataset without prices not to allow user create other columns based on it
+    selected_dt <- select(selected_dt, -c(price, price_in_dollar))
+    updateSelectInput(session, "select_column", choices = colnames(selected_dt))
+    
+    #show this dataset to users
+    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
+      scrollX = TRUE
+    ))
   })
   
+  #it should activate select in groupies, but i need to check whether it works without this function
   observeEvent(input$make_select_work, {
     updateSelectInput(session, "select_column", choices = colnames(selected_dt))
   })
   
+  #updates buttons content
   observeEvent(input$initial_table_columns_selected, {
     
+    #isolate selected columns POSITIONS
     selected_popkas <- isolate(input$initial_table_columns_selected)
     
     complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
     complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
     selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
     selected_dt <- read.csv2(selected_path)
-    selected_dt <- select(selected_dt, -c(X))
     
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(X, price, price_in_dollar))
     
     positions <- c(selected_popkas)
     withfilters <- dplyr::select(selected_dt, positions)
@@ -77,23 +136,51 @@ function(input, output, session) {
     complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
     selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
     selected_dt <- read.csv2(selected_path)
-    selected_dt <- select(selected_dt, -c(X))
     
+    #save price and price_in_dollar into another dataset to add it later
+    prices <- select(selected_dt, price, price_in_dollar)
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(X, price, price_in_dollar))
     
     positions <- c(selected_popkas)
     withfilters <- dplyr::select(selected_dt, positions)
-    withfilters$plusplus <- withfilters[1]+withfilters[2]
-    if (ncol(withfilters)>3) {
-      for (i in 3:(ncol(withfilters)-1)) {
-        withfilters$plusplus <- withfilters$plusplus+withfilters[i] 
-      }
-    }
-    selected_dt$plusplus <- as.matrix(withfilters$plusplus)
-    colnames(selected_dt)[ncol(selected_dt)] <- 
-      input$plus_name
-    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'))
+    parent_column_names <- paste(colnames(withfilters), collapse = ", ")
+
+    source("plus_module.R")
+    selected_dt <- callModule(a, "plus", reactive(selected_dt), reactive(parent_column_names), reactive(input$plus_name))
+    
+    #dts should be written with price, price_in_dollar and new column
+    #should add price and price_in_dollar before writing dts
+    selected_dt <- cbind(prices, selected_dt)
+    
     write.csv2(selected_dt, selected_path)
-    write.csv2(selected_dt, "~/Downloads/cargo_type_module/temporary.csv")
+    
+    models <- read.csv2("~/Downloads/models.csv")
+    temporary_name <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+    
+    #write temporary file with all prices
+    write.csv2(selected_dt, temporary_name)
+    
+    columns_table <- read.csv2("columns_table.csv")
+    columns_table <- select(columns_table, -c(X))
+    columns_table <- filter(columns_table, column_name != input$plus_name)
+    column_name <- input$plus_name
+    profile_module_used <- "plus_module.R"
+    addition <- data.frame(column_name, profile_module_used, parent_column_names)
+    columns_table <- rbind(columns_table, addition)
+    write.csv2(columns_table, "columns_table.csv")
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(price, price_in_dollar))
+    
+    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
+      scrollX = TRUE
+    ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   
@@ -105,23 +192,49 @@ function(input, output, session) {
     complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
     selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
     selected_dt <- read.csv2(selected_path)
-    selected_dt <- select(selected_dt, -c(X))
     
+    #save price and price_in_dollar into another dataset to add it later
+    prices <- select(selected_dt, price, price_in_dollar)
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(X, price, price_in_dollar))
     
     positions <- c(selected_popkas)
     withfilters <- dplyr::select(selected_dt, positions)
-    withfilters$minusminus <- withfilters[1]-withfilters[2]
-    if (ncol(withfilters)>3) {
-      for (i in 3:(ncol(withfilters)-1)) {
-        withfilters$minusminus <- withfilters$minusminus-withfilters[i] 
-      }
-    }
-    selected_dt$minusminus <- as.matrix(withfilters$minusminus)
-    colnames(selected_dt)[ncol(selected_dt)] <- 
-      input$plus_name
-    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'))
+    parent_column_names <- paste(colnames(withfilters), collapse = ", ")
+    
+    source("minus_module.R")
+    selected_dt <- callModule(a, "minus", reactive(selected_dt), reactive(parent_column_names), reactive(input$plus_name))
+    
+    #dts should be written with price, price_in_dollar and new column
+    #should add price and price_in_dollar before writing dts
+    selected_dt <- cbind(prices, selected_dt)
+    
     write.csv2(selected_dt, selected_path)
-    write.csv2(selected_dt, "~/Downloads/cargo_type_module/temporary.csv")
+    
+    models <- read.csv2("~/Downloads/models.csv")
+    temporary_name <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+    
+    #write temporary file with all prices
+    write.csv2(selected_dt, temporary_name)
+    
+    columns_table <- read.csv2("columns_table.csv")
+    columns_table <- select(columns_table, -c(X))
+    columns_table <- filter(columns_table, column_name != input$plus_name)
+    column_name <- input$plus_name
+    profile_module_used <- "minus_module.R"
+    addition <- data.frame(column_name, profile_module_used, parent_column_names)
+    columns_table <- rbind(columns_table, addition)
+    write.csv2(columns_table, "columns_table.csv")
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(price, price_in_dollar))
+    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
+      scrollX = TRUE
+    ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$multiplymultiply, {
@@ -132,23 +245,51 @@ function(input, output, session) {
     complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
     selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
     selected_dt <- read.csv2(selected_path)
-    selected_dt <- select(selected_dt, -c(X))
     
+    #save price and price_in_dollar into another dataset to add it later
+    prices <- select(selected_dt, price, price_in_dollar)
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(X, price, price_in_dollar))
     
     positions <- c(selected_popkas)
     withfilters <- dplyr::select(selected_dt, positions)
-    withfilters$multiplymultiply <- withfilters[1]*withfilters[2]
-    if (ncol(withfilters)>3) {
-      for (i in 3:(ncol(withfilters)-1)) {
-        withfilters$multiplymultiply <- withfilters$multiplymultiply*withfilters[i] 
-      }
-    }
-    selected_dt$multiplymultiply <- as.matrix(withfilters$multiplymultiply)
-    colnames(selected_dt)[ncol(selected_dt)] <- 
-      input$plus_name
-    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'))
+    parent_column_names <- paste(colnames(withfilters), collapse = ", ")
+    
+    source("multiply_module.R")
+    selected_dt <- callModule(a, "multiply", reactive(selected_dt), reactive(parent_column_names), reactive(input$plus_name))
+
+    #dts should be written with price, price_in_dollar and new column
+    #should add price and price_in_dollar before writing dts
+    selected_dt <- cbind(prices, selected_dt)
+    
     write.csv2(selected_dt, selected_path)
-    write.csv2(selected_dt, "~/Downloads/cargo_type_module/temporary.csv")
+    
+    models <- read.csv2("~/Downloads/models.csv")
+    temporary_name <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+    
+    #write temporary file with all prices
+    write.csv2(selected_dt, temporary_name)
+    
+    columns_table <- read.csv2("columns_table.csv")
+    columns_table <- select(columns_table, -c(X))
+    columns_table <- filter(columns_table, column_name != input$plus_name)
+    column_name <- input$plus_name
+    profile_module_used <- "multiply_module.R"
+    addition <- data.frame(column_name, profile_module_used, parent_column_names)
+    columns_table <- rbind(columns_table, addition)
+    write.csv2(columns_table, "columns_table.csv")
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(price, price_in_dollar))
+    
+    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
+      scrollX = TRUE
+    ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$dividedivide, {
@@ -159,23 +300,51 @@ function(input, output, session) {
     complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
     selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
     selected_dt <- read.csv2(selected_path)
-    selected_dt <- select(selected_dt, -c(X))
     
+    #save price and price_in_dollar into another dataset to add it later
+    prices <- select(selected_dt, price, price_in_dollar)
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(X, price, price_in_dollar))
     
     positions <- c(selected_popkas)
     withfilters <- dplyr::select(selected_dt, positions)
-    withfilters$dividedivide <- withfilters[1]/withfilters[2]
-    if (ncol(withfilters)>3) {
-      for (i in 3:(ncol(withfilters)-1)) {
-        withfilters$dividedivide <- withfilters$dividedivide/withfilters[i] 
-      }
-    }
-    selected_dt$dividedivide <- as.matrix(withfilters$dividedivide)
-    colnames(selected_dt)[ncol(selected_dt)] <- 
-      input$plus_name
-    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'))
+    parent_column_names <- paste(colnames(withfilters), collapse = ", ")
+    
+    source("divide_module.R")
+    selected_dt <- callModule(a, "divide", reactive(selected_dt), reactive(parent_column_names), reactive(input$plus_name))
+
+    #dts should be written with price, price_in_dollar and new column
+    #should add price and price_in_dollar before writing dts
+    selected_dt <- cbind(prices, selected_dt)
+    
     write.csv2(selected_dt, selected_path)
-    write.csv2(selected_dt, "~/Downloads/cargo_type_module/temporary.csv")
+    
+    models <- read.csv2("~/Downloads/models.csv")
+    temporary_name <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+    
+    #write temporary file with all prices
+    write.csv2(selected_dt, temporary_name)
+    
+    columns_table <- read.csv2("columns_table.csv")
+    columns_table <- select(columns_table, -c(X))
+    columns_table <- filter(columns_table, column_name != input$plus_name)
+    column_name <- input$plus_name
+    profile_module_used <- "divide_module.R"
+    addition <- data.frame(column_name, profile_module_used, parent_column_names)
+    columns_table <- rbind(columns_table, addition)
+    write.csv2(columns_table, "columns_table.csv")
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(price, price_in_dollar))
+    
+    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
+      scrollX = TRUE
+    ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$loglog, {
@@ -186,18 +355,51 @@ function(input, output, session) {
     complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
     selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
     selected_dt <- read.csv2(selected_path)
-    selected_dt <- select(selected_dt, -c(X))
     
+    #save price and price_in_dollar into another dataset to add it later
+    prices <- select(selected_dt, price, price_in_dollar)
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(X, price, price_in_dollar))
     
     positions <- c(selected_popkas)
     withfilters <- dplyr::select(selected_dt, positions)
-    withfilters$loglog <- log(withfilters[1])
-    selected_dt$loglog <- as.matrix(withfilters$loglog)
-    colnames(selected_dt)[ncol(selected_dt)] <- 
-      input$plus_name
-    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'))
+    parent_column_names <- paste(colnames(withfilters), collapse = ", ")
+    
+    source("log_module.R")
+    selected_dt <- callModule(a, "log", reactive(selected_dt), reactive(parent_column_names), reactive(input$plus_name))
+
+    #dts should be written with price, price_in_dollar and new column
+    #should add price and price_in_dollar before writing dts
+    selected_dt <- cbind(prices, selected_dt)
+    
     write.csv2(selected_dt, selected_path)
-    write.csv2(selected_dt, "~/Downloads/cargo_type_module/temporary.csv")
+    
+    models <- read.csv2("~/Downloads/models.csv")
+    temporary_name <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+    
+    #write temporary file with all prices
+    write.csv2(selected_dt, temporary_name)
+    
+    columns_table <- read.csv2("columns_table.csv")
+    columns_table <- select(columns_table, -c(X))
+    columns_table <- filter(columns_table, column_name != input$plus_name)
+    column_name <- input$plus_name
+    profile_module_used <- "log_module.R"
+    addition <- data.frame(column_name, profile_module_used, parent_column_names)
+    columns_table <- rbind(columns_table, addition)
+    write.csv2(columns_table, "columns_table.csv")
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(price, price_in_dollar))
+    
+    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
+      scrollX = TRUE
+    ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$expexp, {
@@ -208,18 +410,51 @@ function(input, output, session) {
     complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
     selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
     selected_dt <- read.csv2(selected_path)
-    selected_dt <- select(selected_dt, -c(X))
     
+    #save price and price_in_dollar into another dataset to add it later
+    prices <- select(selected_dt, price, price_in_dollar)
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(X, price, price_in_dollar))
     
     positions <- c(selected_popkas)
     withfilters <- dplyr::select(selected_dt, positions)
-    withfilters$expexp <- exp(withfilters[1])
-    selected_dt$expexp <- as.matrix(withfilters$expexp)
-    colnames(selected_dt)[ncol(selected_dt)] <- 
-      input$plus_name
-    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'))
+    parent_column_names <- paste(colnames(withfilters), collapse = ", ")
+    
+    source("exp_module.R")
+    selected_dt <- callModule(a, "exp", reactive(selected_dt), reactive(parent_column_names), reactive(input$plus_name))
+
+    #dts should be written with price, price_in_dollar and new column
+    #should add price and price_in_dollar before writing dts
+    selected_dt <- cbind(prices, selected_dt)
+    
     write.csv2(selected_dt, selected_path)
-    write.csv2(selected_dt, "~/Downloads/cargo_type_module/temporary.csv")
+    
+    models <- read.csv2("~/Downloads/models.csv")
+    temporary_name <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+    
+    #write temporary file with all prices
+    write.csv2(selected_dt, temporary_name)
+    
+    columns_table <- read.csv2("columns_table.csv")
+    columns_table <- select(columns_table, -c(X))
+    columns_table <- filter(columns_table, column_name != input$plus_name)
+    column_name <- input$plus_name
+    profile_module_used <- "exp_module.R"
+    addition <- data.frame(column_name, profile_module_used, parent_column_names)
+    columns_table <- rbind(columns_table, addition)
+    write.csv2(columns_table, "columns_table.csv")
+    
+    #these positions have to equal the positions selected, that is why dt has to be the same
+    selected_dt <- select(selected_dt, -c(price, price_in_dollar))
+    
+    output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
+      scrollX = TRUE
+    ))
+    #forbid users to uncheck obligatory columns
+    selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+    updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                             selected = colnames(selected_dt), inline = TRUE)
   })
   
   observeEvent(input$create_new_group, {
@@ -302,6 +537,7 @@ function(input, output, session) {
     }
     
     write.csv2(cargo_types, file = "data_table_column_vector.csv")
+    #click("show_unhandled")
   })
   
   observeEvent(input$int_range_setup, {
@@ -380,6 +616,28 @@ function(input, output, session) {
       animation = TRUE,
       callbackR = function(x) {
         
+        #load profiles
+        cargo_profiles <- read.csv2("~/Downloads/groups_profiles.csv")
+        cargo_profiles <- select(cargo_profiles, user_groups_profile_name, system_groups_profile_name)
+        
+        #check the last number, then plus one
+        system_groups_profile_name <- paste0("groups_profile_", as.numeric(gsub('\\D+','', tail(cargo_profiles, n=1)$system_groups_profile_name))+1, ".csv")
+        
+        #load input name
+        user_groups_profile_name <- input$shinyalert
+        
+        addition <- data.frame(user_groups_profile_name, system_groups_profile_name)
+        
+        #upload created dataset
+        cargo_types <- read.csv2("data_table_column_vector.csv")
+        cargo_types <- select(cargo_types, -c(X))
+        print(head(cargo_types))
+        write.csv2(cargo_types, file = paste0("groups_profile_", as.numeric(gsub('\\D+','', tail(cargo_profiles, n=1)$system_groups_profile_name))+1, ".csv"))
+        cargo_profiles <- rbind(cargo_profiles, addition)
+        write.csv2(cargo_profiles, file = "~/Downloads/groups_profiles.csv")
+        
+        updateSelectInput(session, "select_cargo_type_profile", choices = cargo_profiles$user_groups_profile_name)
+
         #upload original dataset
         complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
         complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
@@ -388,18 +646,45 @@ function(input, output, session) {
         selected_dt <- select(selected_dt, -c(X))
         selected_dt$column_vector <- pull(select(selected_dt, input$select_column))
         
-        #upload created dataset
-        cargo_types <- read.csv2("data_table_column_vector.csv")
-        cargo_types <- select(cargo_types, -c(X, Freq))
-        
         #left_join it
         selected_dt <- left_join(selected_dt, cargo_types, by = "column_vector")
         #give the name to the new column
         colnames(selected_dt)[ncol(selected_dt)] <- 
           input$shinyalert
+        
+        selected_dt <- select(selected_dt, -c(column_vector))
+        
         #save it
         write.csv2(selected_dt, selected_path)
-        write.csv2(selected_dt, "~/Downloads/cargo_type_module/temporary.csv")
+        
+        models <- read.csv2("~/Downloads/models.csv")
+        temporary_name <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+        
+        #write temporary file with all prices
+        write.csv2(selected_dt, temporary_name)
+        
+        #output without price and price_in_dollar
+        selected_dt <- select(selected_dt, -c(price, price_in_dollar, Freq))
+        output$initial_table <- DT::renderDataTable(selected_dt, selection = list(target = 'column'), options = list(
+          scrollX = TRUE
+        ))
+        
+        #for checkbox exclude necessary columns
+        selected_dt <- select(selected_dt, -c(distance, volume, weight, region.x, region.y, lat_to, lat_from, long_to, long_from))
+        updateCheckboxGroupInput(session, "checkGroup", label = "Выбор столбцов для обчучения модели", choices = colnames(selected_dt),
+                                 selected = colnames(selected_dt), inline = TRUE)
+        columns_table <- read.csv2("columns_table.csv")
+        columns_table <- select(columns_table, -c(X))
+        columns_table <- filter(columns_table, column_name != input$shinyalert)
+        column_name <- input$shinyalert
+        profile_module_used <- paste0("groups_profile_", 
+                                      as.numeric(gsub('\\D+','', tail(cargo_profiles, n=1)$system_groups_profile_name)), ".csv")
+        
+        parent_column_names <- input$select_column
+        addition <- data.frame(column_name, profile_module_used, parent_column_names)
+        columns_table <- rbind(columns_table, addition)
+        write.csv2(columns_table, "columns_table.csv")
+        
       }
     )
   })
@@ -436,7 +721,6 @@ function(input, output, session) {
         user_groups_profile_name <- input$shinyalert
         
         addition <- data.frame(user_groups_profile_name, system_groups_profile_name)
-        
         
         cargo_types <- read.csv2("data_table_column_vector.csv")
         cargo_types <- select(cargo_types, -c(X))
@@ -497,11 +781,11 @@ function(input, output, session) {
   })
   
   observeEvent(input$many_plots_generator, {
-    complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
-    complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
-    selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
-    selected_dt <- read.csv2(selected_path)
-    selected_dt <- select(selected_dt, -c(X, X.1))
+    models <- read.csv2("~/Downloads/models.csv")
+    
+    #read temporary
+    selected_dt <- read.csv2(paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv"))
+    selected_dt <- select(selected_dt, -c(X))
     selected_dt <- dplyr::select_if(selected_dt, is.numeric)
     # Insert the right number of plot output objects into the web page
     output$plots <- renderUI({
@@ -533,11 +817,11 @@ function(input, output, session) {
   })
   
   observeEvent(input$many_groups_generator, {
-    complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
-    complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
-    selected_path <- paste0("~/Downloads/", complete_dts_filter$system_name)
-    selected_dt <- read.csv2(selected_path)
-    selected_dt <- select(selected_dt, -c(X, X.1))
+    models <- read.csv2("~/Downloads/models.csv")
+    
+    #read temporary
+    selected_dt <- read.csv2(paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv"))
+    selected_dt <- select(selected_dt, -c(X))
     selected_dt_logic <- dplyr::select_if(selected_dt, is.logical)
     # To do it for all names
     selected_dt_logic[] <- lapply( selected_dt_logic, factor) # the "[]" keeps the dataframe structure
@@ -547,7 +831,6 @@ function(input, output, session) {
     selected_dt <- data.frame(selected_dt, selected_dt_logic)
     selected_dt <- dplyr::select_if(selected_dt, is.factor)
     # Insert the right number of plot output objects into the web page
-    
     output$groupies <- renderUI({
       plot_output_list <- lapply(1:ncol(selected_dt), function(i) {
         plotname <- paste("group", i, sep="")
@@ -632,6 +915,7 @@ function(input, output, session) {
   
   low_border <- eventReactive({
     input$apply_numeric_filter
+    input$delete_filters
     input$select_column_filter
     }, {
     lower_border <- read.csv2("~/Downloads/cargo_type_module/lower_border.csv")
@@ -641,6 +925,7 @@ function(input, output, session) {
   
   up_border <- eventReactive({
     input$apply_numeric_filter
+    input$delete_filters
     input$select_column_filter
   }, {
     upper_border <- read.csv2("~/Downloads/cargo_type_module/upper_border.csv")
@@ -650,6 +935,7 @@ function(input, output, session) {
   
   fac_filter <- eventReactive({
     input$apply_factor_filter
+    input$delete_filters
     input$select_column_filter
   }, {
     factor_filter <- read.csv2("~/Downloads/cargo_type_module/factor_filter.csv")
@@ -662,7 +948,10 @@ function(input, output, session) {
     up_border_col_sel <- isolate(input$upper_border_rows_selected)
     fac_filter_col_sel <- isolate(input$factor_filter_rows_selected)
     
-    temporary <- read.csv2("temporary.csv")
+    models <- read.csv2("~/Downloads/models.csv")
+    
+    #read temporary
+    temporary <- read.csv2(paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv"))
     temporary <- select(temporary, -c(X))
     
     lower_border <- read.csv2("lower_border.csv")
@@ -724,19 +1013,78 @@ function(input, output, session) {
         }
       }
     }
-    write.csv2(temporary, "temporary.csv")
+    models <- read.csv2("~/Downloads/models.csv")
+    temporary_name <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+    
+    #write temporary file with all prices
+    write.csv2(temporary, temporary_name)
+  })
+  
+  observeEvent(input$delete_filters, {
+    low_border_col_sel <- isolate(input$lower_border_rows_selected)
+    up_border_col_sel <- isolate(input$upper_border_rows_selected)
+    fac_filter_col_sel <- isolate(input$factor_filter_rows_selected)
+    
+    #upload filter dataset
+    if (length(low_border_col_sel) > 0){
+      lower_border <- read.csv2("lower_border.csv")
+      lower_border <- select(lower_border, -c(X))
+      lower_border$id <- c(1:nrow(lower_border))
+      changed_values <- filter(lower_border, id != low_border_col_sel[1])
+      
+      if (length(low_border_col_sel) > 1){
+        for (i in 2:length(low_border_col_sel)){
+          changed_values <- filter(changed_values, id != low_border_col_sel[i])
+        }
+      }
+      changed_values <- select(changed_values, -c(id))
+      write.csv2(changed_values, "lower_border.csv")
+    }
+    
+    if (length(up_border_col_sel) > 0){
+      upper_border <- read.csv2("upper_border.csv")
+      upper_border <- select(upper_border, -c(X))
+      upper_border$id <- c(1:nrow(upper_border))
+      changed_values <- filter(upper_border, id != up_border_col_sel[1])
+      
+      if (length(up_border_col_sel) > 1){
+        for (i in 2:length(up_border_col_sel)){
+          changed_values <- filter(changed_values, id != up_border_col_sel[i])
+        }
+      }
+      changed_values <- select(changed_values, -c(id))
+      write.csv2(changed_values, "upper_border.csv")
+    }
+    
+    if (length(fac_filter_col_sel) > 0){
+      factor_filter <- read.csv2("factor_filter.csv")
+      factor_filter <- select(factor_filter, -c(X))
+      factor_filter$id <- c(1:nrow(factor_filter))
+      changed_values <- filter(factor_filter, id != fac_filter_col_sel[1])
+      
+      if (length(fac_filter_col_sel) > 1){
+        for (i in 2:length(fac_filter_col_sel)){
+          changed_values <- filter(changed_values, id != fac_filter_col_sel[i])
+        }
+      }
+      changed_values <- select(changed_values, -c(id))
+      write.csv2(changed_values, "factor_filter.csv")
+    }
   })
   
   observeEvent(input$unsupervised, {
     #import temporary dataset
-    temporary <- read.csv2("temporary.csv")
+    models <- read.csv2("~/Downloads/models.csv")
+    
+    #read temporary
+    temporary <- read.csv2(paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv"))
     temporary <- select(temporary, -c(X))
     #do na.omit
     temporary <- na.omit(temporary)
     
     #perform select according to the checkBoxGroup
-    temporary <- select(temporary, input$checkGroup)
-    
+    temporary <- select(temporary, distance, volume, weight, lat_to, lat_from, long_to, long_from, input$checkGroup)
+    print(sapply(temporary, class))
     hc.complete=hclust(dist(temporary), method=input$cluster_method)
     hclusters <<- cutree(hc.complete, input$clusters_number)
     
@@ -744,12 +1092,15 @@ function(input, output, session) {
   
   observeEvent(input$make_the_tree, {
     #import temporary dataset
-    temporary <- read.csv2("temporary.csv")
+    models <- read.csv2("~/Downloads/models.csv")
+    
+    #read temporary
+    temporary <- read.csv2(paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv"))
     temporary <- select(temporary, -c(X))
     #do na.omit
     temporary <- na.omit(temporary)
     #perform select according to the checkBoxGroup
-    temporary <- select(temporary, input$checkGroup)
+    temporary <- select(temporary, price, distance, volume, weight, lat_to, lat_from, long_to, long_from, input$checkGroup)
     
     if (length(hclusters)>0) {
       temporary$clusters <- hclusters
@@ -762,23 +1113,36 @@ function(input, output, session) {
     rfModel <-randomForest(price ~ ., data=train)
     rfPredict<-predict(rfModel, test, probability=FALSE)
     rfPredict<-data.frame(rfPredict)
-    output$accuracy <- renderText(paste0("Точность:", ((1-mean(abs(rfPredict$rfPredict-test$price)/test$price))*100),"%"))
-  })
-  
-  observeEvent(input$save_the_model, {
-    
+    ruble <- paste0((1-(mean(abs(rfPredict$rfPredict-test$price)/test$price)))*100,"%")
+   
     #import temporary dataset
-    temporary <- read.csv2("temporary.csv")
+    models <- read.csv2("~/Downloads/models.csv")
+    
+    #read temporary
+    temporary <- read.csv2(paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv"))
     temporary <- select(temporary, -c(X))
     #do na.omit
     temporary <- na.omit(temporary)
     #perform select according to the checkBoxGroup
-    temporary <- select(temporary, input$checkGroup)
+    temporary <- select(temporary, price_in_dollar, distance, volume, weight, lat_to, lat_from, long_to, long_from, input$checkGroup)
     
     if (length(hclusters)>0) {
       temporary$clusters <- hclusters
     }
     
+    #do all the tree things
+    train_ind <- sample(1:nrow(temporary), 0.85*nrow(temporary))
+    train <- temporary[train_ind,]
+    test <- temporary[-train_ind,]
+    rfModel <-randomForest(price_in_dollar ~ ., data=train)
+    rfPredict<-predict(rfModel, test, probability=FALSE)
+    rfPredict<-data.frame(rfPredict)
+    dollar <- paste0((1-(mean(abs(rfPredict$rfPredict-test$price_in_dollar)/test$price_in_dollar)))*100,"%")
+    output$ruble_dollar <- renderTable(data.frame(ruble, dollar))#, colnames = c('точность прогноза в рублях', 'точность прогноза в долларах'))
+  })
+  
+  observeEvent(input$save_the_model, {
+
     shinyalert(
       title = "Создать модель",
       text = "Введите название для модели",
@@ -799,29 +1163,106 @@ function(input, output, session) {
       animation = TRUE,
       callbackR = function(x) { if(x != FALSE) {
         
-        models <- read.csv2("models.csv")
+        #import models dt that contains all the models created
+        models <- read.csv2("~/Downloads/models.csv")
         models <- select(models, -c(X))
         
         #load input name
-        rfModel <-randomForest(price ~ ., data=temporary)
         user_model_name <- input$shinyalert
         server_model_name <- paste0(tail((as.numeric(gsub('\\D+','', models$server_model_name))), n=1)+1, ".Rdata")
+        dollar_model_name <- paste0("dollar_", tail((as.numeric(gsub('\\D+','', models$dollar_model_name))), n=1)+1, ".Rdata")
+        columns_table <- paste0("columns_table_", tail((as.numeric(gsub('\\D+','', models$columns_table))), n=1)+1, ".csv")
         
+        #if there are clusters, create cluster prediction model
         if (length(hclusters)>0) {
-          temporary <- select(temporary, -c(price))
-          rfModel_cluster <-randomForest(clusters ~ ., data=temporary)
+          
+          #import temporary dataset
+          models <- read.csv2("~/Downloads/models.csv")
+          
+          #read temporary
+          temporary <- read.csv2(paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv"))
+          temporary <- select(temporary, -c(X))
+          #do na.omit
+          temporary <- na.omit(temporary)
+          #perform select according to the checkBoxGroup
+          temporary <- select(temporary, distance, volume, weight, lat_to, lat_from, long_to, long_from, input$checkGroup)
+            
+          temporary$clusters <- hclusters
+          
+          #make clusters character - factor values
+          temporary$clusters <- as.factor(temporary$clusters)
+          
+          rfModel_cluster <-randomForest(factor(clusters) ~ ., data=temporary)
           cluster_model_name <- paste0("cluster", tail((as.numeric(gsub('\\D+','', na.omit(models$cluster_model_name)))), n=1)+1, ".Rdata")
           save(rfModel_cluster, file = cluster_model_name)
         } else {
-          server_model_name <- NA
+          cluster_model_name <- NA
+        }
+        #import temporary dataset
+        models <- read.csv2("~/Downloads/models.csv")
+        
+        #read temporary
+        temporary <- read.csv2(paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv"))
+        temporary <- select(temporary, -c(X))
+        #do na.omit
+        temporary <- na.omit(temporary)
+        #perform select according to the checkBoxGroup
+        temporary <- select(temporary, price, distance, volume, weight, lat_to, lat_from, long_to, long_from, input$checkGroup)
+        
+        if (length(hclusters)>0) {
+          temporary$clusters <- hclusters
+          #make clusters character - factor values
+          temporary$clusters <- as.factor(temporary$clusters)
         }
         
-        addition <- data.frame(user_model_name, server_model_name, cluster_model_name)
-        models <- rbind(models, addition)
+        #machine learning on price prediction
+        #print(colnames(temporary))
+        rfModel <-randomForest(price ~ ., data=temporary)
         
+        complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
+        complete_dts_filter <- filter(complete_dts, user_name == input$initial_select)
+        cargo_types_ds <- as.character(complete_dts_filter$cargo_types_ds)
         save(rfModel, file = server_model_name)
-        write.csv2(models, "models.csv")
+        
+        #import temporary dataset
+        models <- read.csv2("~/Downloads/models.csv")
+        models <- select(models, -c(X))
+        #read temporary
+        temporary <- read.csv2(paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv"))
+        temporary <- select(temporary, -c(X))
+        #do na.omit
+        temporary <- na.omit(temporary)
+        #perform select according to the checkBoxGroup
+        temporary <- select(temporary, price_in_dollar, distance, volume, weight, lat_to, lat_from, long_to, long_from, input$checkGroup)
+        
+        if (length(hclusters)>0) {
+          temporary$clusters <- hclusters
+          #make clusters character - factor values
+          temporary$clusters <- as.factor(temporary$clusters)
+        }
+        
+        #machine learning on price prediction
+        rfModel_dollar <-randomForest(price_in_dollar ~ ., data=temporary)
+        save(rfModel_dollar, file = dollar_model_name)
+        
+        original_dt <- as.character(complete_dts_filter$system_name)
+        car_types_ds <- as.character(complete_dts_filter$car_types_ds)
+        column_name <- temporary
+        temporary <- paste0("temporary", as.numeric(gsub('\\D+','', tail(models, n=1)$temporary))+1, ".csv")
+        addition <- data.frame(user_model_name, server_model_name, cluster_model_name, columns_table, cargo_types_ds, original_dt, dollar_model_name, car_types_ds, temporary)
+        models <- rbind(models, addition)
         updateSelectInput(session, "choose_for_prediction", choices = (models$user_model_name))
+        write.csv2(models, "~/Downloads/models.csv")
+
+        column_name <- colnames(column_name)
+        column_name <- data.frame(column_name)
+        
+        columns_table <- read.csv2("columns_table.csv")
+        columns_table <- select(columns_table, -c(X))
+        
+        column_name <- left_join(column_name, columns_table)
+        write.csv2(column_name, file = as.character(addition$columns_table))
+        
         print("Done")
       }}
     )
@@ -833,12 +1274,44 @@ function(input, output, session) {
     write.csv2(the_model_to_use, "the_model_to_use.csv")
   })
   
+  observeEvent(input$delete_model, {
+    
+    shinyalert(
+      title = "Вы точно хотите удалить эту модель?",
+      text = "Результат будет необратим",
+      closeOnEsc = FALSE,
+      closeOnClickOutside = FALSE,
+      html = FALSE,
+      type = "error",
+      showConfirmButton = TRUE,
+      showCancelButton = TRUE,
+      confirmButtonText = "Удалить",
+      confirmButtonCol = "#ED4242",
+      cancelButtonText = "Нет, оставить",
+      timer = 0,
+      imageUrl = "",
+      animation = TRUE,
+      callbackR = function(x) { if(x == TRUE) {
+        
+        models <- read.csv2("~/Downloads/models.csv")
+        models <- select(models, -c(X))
+        
+        models <- filter(models, user_model_name != input$choose_for_prediction)
+        
+        updateSelectInput(session, "choose_for_prediction", choices = (models$user_model_name))
+        
+        write.csv2(models, "~/Downloads/models.csv")
+      }}
+    )
+  })
+  
   df <- eventReactive({input$create_new_rule
     input$add_elements_to_selected_groups
     input$use_profile
     input$int_range_setup
     #input$delete_rule
     input$show_unhandled}, {
+      Sys.sleep(1)
       cargo_types <- read.csv2("data_table_column_vector.csv")
       cargo_types <- select(cargo_types, -c(X))
       nocargotype <- data.frame(cargo_types[!duplicated(cargo_types$the_group), ])

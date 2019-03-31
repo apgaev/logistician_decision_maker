@@ -6,7 +6,7 @@ library(shinyalert)
 
 complete_dts <- read.csv2("~/Downloads/complete_dts.csv")
 cargo_profiles <- read.csv2("~/Downloads/groups_profiles.csv")
-models <- read.csv2("models.csv")
+models <- read.csv2("~/Downloads/models.csv")
 
 dashboardPage(
   dashboardHeader(title = "Модельер"
@@ -27,19 +27,27 @@ dashboardPage(
               fluidRow(
                 column(1),
                 column(
-                  9, 
+                  6, 
                   br(),
                   selectInput("initial_select", h3("Выберите одну из таблиц антикафе"), choices = complete_dts$user_name),
                   textInput("plus_name", "Наименование нового столбца латиницей без пробелов"),
-                  actionButton("make_select_work", "make_select_work"),
-                  actionButton("plusplus", "+"),
-                  actionButton("minusminus", "-"),
-                  actionButton("multiplymultiply", "*"),
-                  actionButton("dividedivide", "/"),
-                  actionButton("loglog", "натуральный логарифм"),
-                  actionButton("expexp", "экспонента")
+                  actionButton("make_select_work", "make_select_work")
                 ),
-                column(2)
+                column(4, br(), br(), br(), br(), br(), br(), actionButton("delete_dts", "Удалить выбранную базу данных")),
+                column(1)
+              ),
+              fluidRow(
+                column(1),
+                column(
+                  10,
+                actionButton("plusplus", "+"),
+                actionButton("minusminus", "-"),
+                actionButton("multiplymultiply", "*"),
+                actionButton("dividedivide", "/"),
+                actionButton("loglog", "натуральный логарифм"),
+                actionButton("expexp", "экспонента")
+                ),
+                column(1)
               ),
               fluidRow(
                 DT::dataTableOutput('initial_table')
@@ -196,7 +204,8 @@ dashboardPage(
             fluidRow(
               column(1),
               column(5, DT::dataTableOutput('lower_border'), DT::dataTableOutput('upper_border')),
-              column(5, DT::dataTableOutput('factor_filter'), actionButton("apply_filters", "Применить выбранные фильтры")),
+              column(5, DT::dataTableOutput('factor_filter'), actionButton("apply_filters", "Применить выбранные фильтры"), 
+                     actionButton("delete_filters", "Удалить выбранные фильтры")),
               column(1)
             )
     ),
@@ -219,8 +228,7 @@ dashboardPage(
             ),
             fluidRow(
               column(1),
-              column(10, verbatimTextOutput("accuracy")
-              ),
+              column(10, tableOutput('ruble_dollar')),
               column(1)
             ),
             fluidRow(
@@ -230,6 +238,14 @@ dashboardPage(
                      #select the model to use in prediction
               ),
               column(5, selectInput("choose_for_prediction", "Выберите модель для прогнозирования", choices = models$user_model_name)
+                     #select the model to use in prediction
+              ),
+              column(1)
+            ),
+            fluidRow(
+              column(1),
+              column(5),
+              column(5, actionButton("delete_model", "Удалить выбранную модель")
                      #select the model to use in prediction
               ),
               column(1)
