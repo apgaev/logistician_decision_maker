@@ -67,7 +67,7 @@ ui <- dashboardPage(
                     fluidRow(
                         actionButton(inputId = "form_the_table", label = "сформировать таблицу"),
                         textInput("dt_name", "Введите наименование для таблицы"),
-                        actionButton(inputId = "save_dt", label = "сохранить"),
+                        actionButton(inputId = "save_dt", label = "сохранить", style="color: #9100BD; background-color: #9EFFC2; border-color: #2e6da4"),
                         DT::dataTableOutput("thedataframe")
                     )
             ),
@@ -318,7 +318,18 @@ server <- function(input, output, session) {
   makeReactiveBinding("departure_final")
   destination_final <- NULL
   makeReactiveBinding("destination_final")
+  
+  
+  
+  observeEvent(input$tabs, {
+    if (input$tabs=="data_load") {
+      output$res <- renderText("В случае возникновения ошибки откройте Ваш файл в MS Excel и через данную программу сохраните его в формате csv, а затем снова попытайтесь осуществить загрузку")
+    } else {
+      output$res <- renderText("Если Вы хотите отнести к какой-либо группе все слова, которые содержат, к примеру, 'тех', просто введите соотвествующее правило")
+    }
     
+  })
+  
   #show cities dts
   observeEvent(input$show_stp, {stpetersburgstreets <- read.csv2("stpetersburgstreets.csv")
     stpetersburgstreets <- dplyr::select(stpetersburgstreets, -c(X))
@@ -1482,11 +1493,23 @@ server <- function(input, output, session) {
           id$payment <- as.character(id$payment)
           
           #add volume
+          print(head(daf[26]))
+          print(tail(daf[26]))
           id$volume <- pull(daf[26])
+          print(head(id$volume))
+          print(tail(id$volume))
           id$volume <- as.character(id$volume)
+          print(head(id$volume))
+          print(tail(id$volume))
           id$volume <- gsub("[[:space:]]", "", id$volume)
+          print(head(id$volume))
+          print(tail(id$volume))
+          id$volume <- gsub("\\,", "\\.", id$volume)
+          print(head(id$volume))
+          print(tail(id$volume))
           id$volume <- as.numeric(id$volume)
-          
+          print(head(id$volume))
+          print(tail(id$volume))
           #add cargo_price
           id$cargo_price <- pull(daf[19])
           id$cargo_price <- as.character(id$cargo_price)
@@ -1507,7 +1530,7 @@ server <- function(input, output, session) {
           moscow = select(dfsix, X, car_type)
           dfsix <- select(dfsix, -c(todelete, car_type))
           moscowbasis <- head(moscow, n=0)
-          
+          progress$close()
           # Create a Progress object
           progress <- shiny::Progress$new()
           # Make sure it closes when we exit this reactive, even if there's an error
@@ -1547,7 +1570,7 @@ server <- function(input, output, session) {
           
           #id, car_type, duration, two_loadings, weight
           final_table <- inner_join(final_table, weight)
-          
+          progress$close()
           # Create a Progress object
           progress <- shiny::Progress$new()
           # Make sure it closes when we exit this reactive, even if there's an error
@@ -1581,7 +1604,7 @@ server <- function(input, output, session) {
           moscow = select(dfsix, X, cargo_type)
           dfsix <- select(dfsix, -c(todelete, cargo_type))
           moscowbasis <- head(moscow, n=0)
-          
+          progress$close()
           # Create a Progress object
           progress <- shiny::Progress$new()
           # Make sure it closes when we exit this reactive, even if there's an error
@@ -1616,6 +1639,8 @@ server <- function(input, output, session) {
           positions <- c(1)
           withfilters <- dplyr::select(daf, positions)
           withfilters$X <- as.character(withfilters$X)
+          print(head(departure_final, n=3))
+          print(tail(departure_final, n=3))
           departure_final <- select(departure_final, -c(nas, todelete, addresses, street))
           #id, car_type, duration, two_loadings, weight
           final_table <- inner_join(final_table, withfilters)
@@ -1696,6 +1721,21 @@ server <- function(input, output, session) {
             addition <- data.frame(user_name, system_name, cargo_types_ds, car_types_ds)
             complete_dts <- rbind(complete_dts, addition)
             write.csv2(complete_dts, file = "complete_dts.csv")
+            shinyalert(
+              title = "Сохранено",
+              text = "",
+              closeOnEsc = TRUE,
+              closeOnClickOutside = TRUE,
+              html = FALSE,
+              type = "success",
+              showConfirmButton = TRUE,
+              showCancelButton = FALSE,
+              confirmButtonText = "OK",
+              confirmButtonCol = "#8AEDA7",
+              timer = 0,
+              imageUrl = "",
+              animation = TRUE
+            )
           })
         })#final table maker observer end
         
