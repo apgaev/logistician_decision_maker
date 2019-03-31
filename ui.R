@@ -13,11 +13,11 @@ dashboardPage(
   ),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Математик", tabName = "data_load", icon = icon("download")),
-      menuItem("Группировщик", tabName = "groupies", icon = icon("folder-open")),
-      menuItem("Садовод", tabName = "treemaker", icon = icon("folder-open")),
-      menuItem("Фильтратор", tabName = "filterer", icon = icon("folder-open")),
-      menuItem("И вот модельер", tabName = "the_modelier", icon = icon("folder-open"))
+      menuItem("Математик", tabName = "data_load", icon = icon("calculator")),
+      menuItem("Группировщик", tabName = "groupies", icon = icon("cubes")),
+      menuItem("Садовод", tabName = "treemaker", icon = icon("envira")),
+      menuItem("Фильтратор", tabName = "filterer", icon = icon("cut")),
+      menuItem("И вот модельер", tabName = "the_modelier", icon = icon("google-wallet"))
     )
   ),
   dashboardBody(
@@ -30,10 +30,12 @@ dashboardPage(
                   6, 
                   br(),
                   selectInput("initial_select", h3("Выберите одну из таблиц антикафе"), choices = complete_dts$user_name),
-                  textInput("plus_name", "Наименование нового столбца латиницей без пробелов"),
-                  actionButton("make_select_work", "make_select_work")
+                  textInput("plus_name", "Наименование нового столбца латиницей без пробелов")#,
+                  #actionButton("make_select_work", "make_select_work")
                 ),
-                column(4, br(), br(), br(), br(), br(), br(), actionButton("delete_dts", "Удалить выбранную базу данных")),
+                column(4, br(), br(), br(), br(), br(), br(), 
+                       actionButton("delete_dts", "Удалить выбранную базу данных", icon("times"), 
+                                                                           style="color: #fff; background-color: #F20303; border-color: #2e6da4")),
                 column(1)
               ),
               fluidRow(
@@ -185,7 +187,8 @@ dashboardPage(
             ),
             fluidRow(
               column(3),
-              column(8, actionButton("make_select_column_filter", "Выбрать столбец")),
+              column(8, actionButton("make_select_column_filter", "Выбрать столбец", icon("check-circle"), 
+                                     style="color: #fff; background-color: #00FFD9; border-color: #2e6da4")),
               column(1)
             ),
             fluidRow(
@@ -197,15 +200,19 @@ dashboardPage(
             ),
             fluidRow(
               column(1),
-              column(5, actionButton("apply_numeric_filter", "Создать фильтр")),
-              column(5, actionButton("apply_factor_filter", "Создать фильтр")),
+              column(5, actionButton("apply_numeric_filter", "Создать фильтр", icon("cut"), 
+                     style="color: #fff; background-color: #1EF003; border-color: #2e6da4")),
+              column(5, actionButton("apply_factor_filter", "Создать фильтр", icon("cut"), 
+                                     style="color: #fff; background-color: #1EF003; border-color: #2e6da4")),
               column(1)
             ),
             fluidRow(
               column(1),
               column(5, DT::dataTableOutput('lower_border'), DT::dataTableOutput('upper_border')),
-              column(5, DT::dataTableOutput('factor_filter'), actionButton("apply_filters", "Применить выбранные фильтры"), 
-                     actionButton("delete_filters", "Удалить выбранные фильтры")),
+              column(5, DT::dataTableOutput('factor_filter'), actionButton("apply_filters", "Применить выбранные фильтры", icon("check"), 
+                                                                           style="color: #fff; background-color: #EB70E5; border-color: #2e6da4"), 
+                     actionButton("delete_filters", "Удалить выбранные фильтры", icon("times"), 
+                                  style="color: #fff; background-color: #F20303; border-color: #2e6da4")),
               column(1)
             )
     ),
@@ -245,7 +252,8 @@ dashboardPage(
             fluidRow(
               column(1),
               column(5),
-              column(5, actionButton("delete_model", "Удалить выбранную модель")
+              column(5, actionButton("delete_model", "Удалить выбранную модель", icon("times"), 
+                                     style="color: #fff; background-color: #F20303; border-color: #2e6da4")
                      #select the model to use in prediction
               ),
               column(1)
